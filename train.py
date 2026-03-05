@@ -57,6 +57,30 @@ def L1_loss_appearance(image, gt_image, gaussians, view_idx, return_transformed_
         transformed_image = torch.nn.functional.interpolate(transformed_image, size=(origH, origW), mode="bilinear", align_corners=True)[0]
         return transformed_image
 
+def pcc_loss(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
+    if pred_depth.dim() == 3:
+        pred_depth = pred_depth.squeeze(0)
+    if gt_depth.dim() == 3:
+        gt_depth = gt_depth.squeeze(0)
+
+    mask = mask > 0
+
+    if mask.sum() < min_valid:
+        return torch.tensor(0.0, device=pred_depth.device)
+
+    pred = pred_depth[mask]
+    gt = gt_depth[mask]
+
+    pred = pred - pred.mean()
+    gt = gt - gt.mean()
+
+    pred_std = pred.std()
+    gt_std = gt.std()
+
+    corr = (pred * gt).mean() / (pred_std * gt_std + eps)
+
+    return 1.0 - corr
+
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
     first_iter = 0
@@ -149,27 +173,40 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         
         if reg_kick_on:
+            original_depth_file = viewpoint_cam.image_name + ".npy"
+            original_depth_dir = os.path.join(dataset.source_path, "depth/")
+            gt_depth = np.load(original_depth_dir + original_depth_file)
+            gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
+            valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
             lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
                 rendered_expected_depth: torch.Tensor = render_pkg["expected_depth"]
                 rendered_median_depth: torch.Tensor = render_pkg["median_depth"]
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
+                depth_mask = render_pkg["mask"].squeeze() > 0
+                combined_mask = depth_mask & valid_mask
+                pcc_depth_loss = pcc_loss(rendered_expected_depth, gt_depth_tensor, combined_mask)
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
                 rendered_median_coord: torch.Tensor = render_pkg["median_coord"]
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
+                pcc_depth_loss = torch.tensor(0.0, device="cuda")
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
         else:
             lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
+            pcc_depth_loss = torch.tensor(0.0, device="cuda")
             
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
-        
-        loss = rgb_loss + depth_normal_loss * lambda_depth_normal
+
+        if iteration > opt.iterations * 0.5:
+            loss = rgb_loss + 0.1 * pcc_depth_loss
+        else:
+            loss = rgb_loss
         loss.backward()
 
         iter_end.record()
