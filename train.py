@@ -179,6 +179,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             gt_depth = np.load(original_depth_dir + original_depth_file)
             gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
             valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
+            original_normal_file = viewpoint_cam.image_name + ".npy"
+            original_normal_dir = os.path.join(dataset.source_path, "normal/")
+            gt_normal = np.load(original_normal_dir + original_normal_file)
+            gt_normal_tensor = torch.tensor(gt_normal, dtype=torch.float32, device="cuda")
+            gt_normal_tensor = gt_normal_tensor.permute(2, 0, 1)
+            gt_normal_tensor = gt_normal_tensor / gt_normal_tensor.norm(p=2, dim=1, keepdim=True)
             lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
                 rendered_expected_depth: torch.Tensor = render_pkg["expected_depth"]
@@ -197,15 +203,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
+            normal_mask = render_pkg["mask"].squeeze().float()
+            normal_diff = torch.norm(gt_normal_tensor - rendered_normal, p=2, dim=0)
+            moge_normal_loss = (normal_diff * normal_mask).sum() / (normal_mask.sum() + 1e-6)
         else:
             lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
             pcc_depth_loss = torch.tensor(0.0, device="cuda")
+            moge_normal_loss = torch.tensor(0.0, device="cuda")
             
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * pcc_depth_loss
+            loss = rgb_loss + 0.1 * pcc_depth_loss + 0.1 * moge_normal_loss
         else:
             loss = rgb_loss
         loss.backward()
