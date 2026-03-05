@@ -29,6 +29,7 @@ try:
 except ImportError:
     TENSORBOARD_FOUND = False
 
+import numpy as np
 from scene.cameras import Camera
 import matplotlib.pyplot as plt
 from utils.vis_utils import apply_depth_colormap
