@@ -70,8 +70,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     opt.position_lr_max_steps = factor * 1000
     opt.densify_until_iter = factor * 500
     opt.regularization_from_iter = factor * 500
-    testing_iterations = [factor * 500, factor * 1000]
-    saving_iterations = [factor * 500, factor * 1000]
+    testing_iterations = [ i*500 for i in range(1, 2*factor+1)]
+    saving_iterations = [factor * 1000]
     checkpoint_iterations = [factor * 500]
     gaussians.training_setup(opt)
     if checkpoint:
