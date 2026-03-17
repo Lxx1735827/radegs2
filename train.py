@@ -21,7 +21,7 @@ import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
-from utils.sam2_utils import save_image_segmentations, load_image_segmentations
+from utils.sam2_utils import save_dir_segmentations, load_image_segmentations
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 try:
@@ -115,7 +115,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     # sam2分割
     original_mask_dir = os.path.join(dataset.source_path, "mask/")
     original_image_dir = os.path.join(dataset.source_path, "train/")
-    save_image_segmentations(original_image_dir, original_mask_dir)
+    save_dir_segmentations(original_image_dir, original_mask_dir)
 
     if dataset.disable_filter3D:
         gaussians.reset_3D_filter()
