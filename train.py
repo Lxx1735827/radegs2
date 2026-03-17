@@ -21,6 +21,7 @@ import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
+from utils.sam2_utils import save_image_segmentations, load_image_segmentations
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 try:
