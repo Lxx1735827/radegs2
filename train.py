@@ -114,7 +114,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     # sam2分割
     original_mask_dir = os.path.join(dataset.source_path, "mask/")
-    original_image_dir = os.path.join(dataset.source_path, "train/")
+    original_image_dir = os.path.join(dataset.source_path, "images/")
     save_dir_segmentations(original_image_dir, original_mask_dir)
 
     if dataset.disable_filter3D:
