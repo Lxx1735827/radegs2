@@ -52,17 +52,3 @@ def save_dir_segmentations(image_dir, save_dir, mode="stack"):
             np.save(save_path, seg_list)
         else:
             raise ValueError("mode 必须是 'stack' 或 'list'")
-
-
-def load_image_segmentations(load_path):
-    """
-    读取 segmentation（支持 stack / list）
-
-    返回：
-        segs:
-            - 如果是 stack → ndarray (N, H, W)
-            - 如果是 list → list[(H, W)]
-    """
-    segs = np.load(load_path, allow_pickle=True)
-
-    return segs
