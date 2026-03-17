@@ -4,3 +4,7 @@ scikit-image
 opencv-python
 plyfile
 tqdm
+hydra-core
+opencv-python
+matplotlib
+iopath
