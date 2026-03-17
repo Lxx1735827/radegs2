@@ -21,6 +21,7 @@ import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
+from utils.sam2_utils import save_image_segmentations, load_image_segmentations
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 try:
@@ -85,6 +86,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     iter_end = torch.cuda.Event(enable_timing = True)
 
     trainCameras = scene.getTrainCameras().copy()
+
+    # sam2分割
+    original_mask_dir = os.path.join(dataset.source_path, "mask/")
+    if not os.path.exists(original_mask_dir):
+        os.makedirs(original_mask_dir)
+        original_image_dir = os.path.join(dataset.source_path, "train/")
+        for fname in os.listdir(original_image_dir):
+            image_path = os.path.join(original_image_dir, fname)
+            base_name = os.path.splitext(fname)[0]
+            save_path = os.path.join(original_mask_dir, base_name + ".npy")
+            save_image_segmentations(image_path, save_path)
+
+
     if dataset.disable_filter3D:
         gaussians.reset_3D_filter()
     else:
