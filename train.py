@@ -114,14 +114,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
     # sam2分割
     original_mask_dir = os.path.join(dataset.source_path, "mask/")
-    if not os.path.exists(original_mask_dir):
-        os.makedirs(original_mask_dir)
-        original_image_dir = os.path.join(dataset.source_path, "train/")
-        for fname in os.listdir(original_image_dir):
-            image_path = os.path.join(original_image_dir, fname)
-            base_name = os.path.splitext(fname)[0]
-            save_path = os.path.join(original_mask_dir, base_name + ".npy")
-            save_image_segmentations(image_path, save_path)
+    original_image_dir = os.path.join(dataset.source_path, "train/")
+    save_image_segmentations(original_image_dir, original_mask_dir)
 
     if dataset.disable_filter3D:
         gaussians.reset_3D_filter()
