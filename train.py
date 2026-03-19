@@ -199,7 +199,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
                 pcc_depth_loss1 = torch.tensor(0.0, device="cuda")
-                pcc_depth_loss2 = pcc_loss(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mas)
+                pcc_depth_loss2 = pcc_loss(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
                 valid_count = 0
                 for sam_mask in sam_masks:
                     combined_mask = depth_mask & valid_mask & sam_mask
