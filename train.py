@@ -201,14 +201,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 pcc_depth_loss1 = torch.tensor(0.0, device="cuda")
                 pcc_depth_loss2 = pcc_loss(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
                 valid_count = 0
-                for sam_mask in sam_masks:
-                    combined_mask = depth_mask & valid_mask & sam_mask
-                    if combined_mask.sum() == 0:
-                        continue
-                    pcc_depth_loss1 += pcc_loss(rendered_expected_depth, gt_depth_tensor, combined_mask)
-                    valid_count += 1
-                if valid_count > 0:
-                    pcc_depth_loss1 /= valid_count
+                # for sam_mask in sam_masks:
+                #     combined_mask = depth_mask & valid_mask & sam_mask
+                #     if combined_mask.sum() == 0:
+                #         continue
+                #     pcc_depth_loss1 += pcc_loss(rendered_expected_depth, gt_depth_tensor, combined_mask)
+                #     valid_count += 1
+                # if valid_count > 0:
+                #     pcc_depth_loss1 /= valid_count
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
