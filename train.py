@@ -200,7 +200,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
                 depth_order_loss = torch.tensor(0.0, device="cuda")
-                pcc_depth_loss = pcc_loss(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
                 valid_count = 0
                 for sam_mask in sam_masks:
                     combined_mask = depth_mask & valid_mask & sam_mask
@@ -217,7 +216,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
                 depth_order_loss = torch.tensor(0.0, device="cuda")
-                pcc_depth_loss = torch.tensor(0.0, device="cuda")
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
@@ -225,12 +223,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
             depth_order_loss = torch.tensor(0.0, device="cuda")
-            pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * pcc_depth_loss + 0.05 * depth_order_loss
+            loss = rgb_loss + 0.1 * depth_order_loss
         else:
             loss = rgb_loss
         loss.backward()
