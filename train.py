@@ -208,7 +208,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     area = combined_mask.sum()
                     if area.item() < min_area:
                         continue
-                    local_loss = compute_depth_order_loss(
+                    local_loss = pcc_loss(
                         rendered_expected_depth,
                         gt_depth_tensor,
                         combined_mask
