@@ -35,7 +35,7 @@ def depth_order_weight_schedule(iteration: int, schedule: str = "default"):
 
 import torch
 from typing import Optional
-
+import torch.nn.functional as F
 
 def _to_hw(x: torch.Tensor, name: str) -> torch.Tensor:
     """
