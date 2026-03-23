@@ -38,12 +38,10 @@ def save_dir_segmentations(image_dir, save_dir, mode="stack"):
 
         # ✅ 已存在就跳过（推荐）
         if os.path.exists(save_path):
-            print(f"跳过已存在: {base_name}")
             continue
         image = cv2.imread(image_path)
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         masks = mask_generator.generate(image)
-        print(f"{base_name} -> mask数量: {len(masks)}")
         seg_list = [m['segmentation'] for m in masks]
         if mode == "stack":
             seg_array = np.stack(seg_list, axis=0)
