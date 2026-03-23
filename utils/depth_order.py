@@ -81,10 +81,6 @@ def compute_depth_order_loss(
     margin: float = 0.01,
     min_prior_diff: float = 0.002,
 ):
-
-    # ------------------------------------------------------------------
-    # 1) Shape handling
-    # ------------------------------------------------------------------
     depth = _to_hw(depth, "depth").float()
     prior_depth = _to_hw(prior_depth, "prior_depth").float()
 
@@ -103,23 +99,14 @@ def compute_depth_order_loss(
     device = depth.device
     N = H * W
 
-    # ------------------------------------------------------------------
-    # 2) Save ORIGINAL valid mask before nan_to_num
-    # ------------------------------------------------------------------
     finite_mask = torch.isfinite(depth) & torch.isfinite(prior_depth)
     base_valid_mask = finite_mask & user_mask
-
-    # Replace invalid values only for safe downstream indexing / math
     depth = torch.nan_to_num(depth, nan=0.0, posinf=0.0, neginf=0.0)
     prior_depth = torch.nan_to_num(prior_depth, nan=0.0, posinf=0.0, neginf=0.0)
 
     scene_extent = float(scene_extent)
     if scene_extent < 1e-6:
         scene_extent = 1e-6
-
-    # ------------------------------------------------------------------
-    # 3) Build pixel coordinates
-    # ------------------------------------------------------------------
     yy, xx = torch.meshgrid(
         torch.arange(H, device=device),
         torch.arange(W, device=device),
@@ -128,20 +115,12 @@ def compute_depth_order_loss(
     pixel_coords = torch.stack([yy.reshape(-1), xx.reshape(-1)], dim=-1)  # [N, 2]
 
     max_pixel_shift = max(int(round(max_pixel_shift_ratio * max(H, W))), 1)
-
-    # ------------------------------------------------------------------
-    # 4) Random local pair sampling
-    #    - avoid self-pairs
-    #    - allow out-of-bound generation, but filter them later
-    # ------------------------------------------------------------------
     pixel_shifts = torch.randint(
         low=-max_pixel_shift,
         high=max_pixel_shift + 1,
         size=(N, 2),
         device=device
     )
-
-    # Remove self-pairs (0, 0)
     zero_shift = (pixel_shifts[:, 0] == 0) & (pixel_shifts[:, 1] == 0)
     retry = 0
     while zero_shift.any() and retry < 10:
@@ -153,31 +132,21 @@ def compute_depth_order_loss(
         )
         zero_shift = (pixel_shifts[:, 0] == 0) & (pixel_shifts[:, 1] == 0)
         retry += 1
-
-    # Very rare fallback
     if zero_shift.any():
         pixel_shifts[zero_shift, 1] = 1
 
     shifted_coords = pixel_coords + pixel_shifts  # [N, 2]
-
     in_bounds = (
         (shifted_coords[:, 0] >= 0) & (shifted_coords[:, 0] < H) &
         (shifted_coords[:, 1] >= 0) & (shifted_coords[:, 1] < W)
     )
-
     non_self = ~(
         (shifted_coords[:, 0] == pixel_coords[:, 0]) &
         (shifted_coords[:, 1] == pixel_coords[:, 1])
     )
-
-    # For safe indexing only; invalid ones will be removed by masks
     shifted_coords_safe = shifted_coords.clone()
     shifted_coords_safe[:, 0] = shifted_coords_safe[:, 0].clamp(0, H - 1)
     shifted_coords_safe[:, 1] = shifted_coords_safe[:, 1].clamp(0, W - 1)
-
-    # ------------------------------------------------------------------
-    # 5) Gather flattened values
-    # ------------------------------------------------------------------
     flat_depth = depth.reshape(-1)
     flat_prior = prior_depth.reshape(-1)
     flat_valid = base_valid_mask.reshape(-1)
@@ -187,55 +156,25 @@ def compute_depth_order_loss(
 
     d_i = flat_depth[base_idx]
     d_j = flat_depth[shifted_idx]
-
     p_i = flat_prior[base_idx]
     p_j = flat_prior[shifted_idx]
-
     valid_i = flat_valid[base_idx]
     valid_j = flat_valid[shifted_idx]
-
-    # ------------------------------------------------------------------
-    # 6) Pairwise diffs
-    # ------------------------------------------------------------------
     diff = (d_i - d_j) / scene_extent
     prior_diff = (p_i - p_j) / scene_extent
-
-    # Ignore ambiguous prior ordering
     order_valid = prior_diff.abs() > float(min_prior_diff)
-
-    # Overall valid pair mask
     pair_valid = valid_i & valid_j & in_bounds & non_self & order_valid
 
-    # ------------------------------------------------------------------
-    # 7) Order target
-    # ------------------------------------------------------------------
     if normalize_loss:
-        # Pure ordinal supervision: only use sign
         target = torch.sign(prior_diff)  # -1 / 0 / +1
     else:
-        # Soft magnitude-aware version, but bounded for stability
         target = torch.tanh(prior_diff)
 
-    # ------------------------------------------------------------------
-    # 8) Hinge-style ordinal loss
-    #    Want: target * diff >= margin
-    #    So : loss = relu(margin - target * diff)
-    # ------------------------------------------------------------------
     pair_loss = F.relu(float(margin) - target * diff)
-
-    # Mask invalid pairs
     pair_loss = pair_loss * pair_valid.float()
-
-    # Final NaN / Inf protection
     pair_loss = torch.nan_to_num(pair_loss, nan=0.0, posinf=0.0, neginf=0.0)
-
-    # Optional compression
     if log_space:
         pair_loss = torch.log1p(float(log_scale) * pair_loss.clamp(min=0.0))
-
-    # ------------------------------------------------------------------
-    # 9) Reduction
-    # ------------------------------------------------------------------
     valid_count = pair_valid.float().sum()
 
     if reduction == "mean":
