@@ -96,7 +96,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     opt.iterations = factor * 1000
     opt.position_lr_max_steps = factor * 1000
     opt.densify_until_iter = factor * 500
-    opt.regularization_from_iter = factor * 0
+    opt.regularization_from_iter = factor * 500
     testing_iterations = [factor * 500, factor * 1000]
     saving_iterations = [factor * 500, factor * 1000]
     checkpoint_iterations = [factor * 500]
