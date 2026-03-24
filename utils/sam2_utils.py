@@ -77,7 +77,7 @@ def save_dir_segmentations(
     median_ksize=5,
     close_kernel=5,
     open_kernel=3,
-    edge_kernel=3,
+    edge_kernel=5,
     edge_dilate_kernel=0,
     edge_dilate_iter=0
 ):
