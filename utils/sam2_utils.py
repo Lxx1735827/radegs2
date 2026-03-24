@@ -72,7 +72,7 @@ def save_dir_segmentations(
     save_dir,
     mode="stack",
     sort_by_area=True,
-    erode_kernel=5,
+    erode_kernel=9,
     erode_iter=1,
     median_ksize=5,
     close_kernel=5,
