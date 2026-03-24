@@ -198,6 +198,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
+                if iteration == 2900:
+                    save_dir = os.path.join(dataset.model_path, "debug_expected_depth")
+                    os.makedirs(save_dir, exist_ok=True)
+
+                    expected_depth_np = rendered_expected_depth.detach().squeeze().cpu().numpy()
+                    np.save(
+                        os.path.join(save_dir, f"{viewpoint_cam.image_name}_iter2900.npy"),
+                        expected_depth_np
+                    )
                 pcc_depth_loss1 = torch.tensor(0.0, device="cuda")
                 pcc_depth_loss2 = pcc_loss(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
                 valid_count = 0
