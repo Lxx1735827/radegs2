@@ -238,7 +238,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.2 * depth_order_loss
+            loss = rgb_loss + 0.1 * depth_order_loss
             if iteration % 100 == 0:
                 print(rgb_loss, depth_order_loss)
         else:
