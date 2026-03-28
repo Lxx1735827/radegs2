@@ -210,7 +210,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
                 total_weight = torch.tensor(0.0, device="cuda")
-                min_area = 100
+                min_area = 1000
                 depth_order_loss = weighted_masked_pcc_loss(
                     prior_depth=gt_depth_tensor,
                     render_depth=rendered_expected_depth,
@@ -218,7 +218,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     prior_valid_mask=valid_mask,
                     render_valid_mask=depth_mask,
                     min_pixels=min_area,
-                    detach_align=True,
+                    detach_align=False,
                     return_aligned_prior=False,
                 )
                 if total_weight.item() > 0:
@@ -243,7 +243,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss
+            loss = rgb_loss + 0.2 * depth_order_loss
+            if iteration % 100 == 0:
+                print(rgb_loss, depth_order_loss)
         else:
             loss = rgb_loss
         loss.backward()
