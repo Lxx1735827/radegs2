@@ -199,27 +199,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
-                depth_order_loss = torch.tensor(0.0, device="cuda")
                 pcc_depth_loss = pcc_loss(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
-                total_weight = torch.tensor(0.0, device="cuda")
                 min_area = 100
-                for sam_mask in sam_masks:
-                    combined_mask = depth_mask & valid_mask & sam_mask
-                    area = combined_mask.sum()
-                    if area.item() < min_area:
-                        continue
-                    local_loss = pcc_loss(
-                        rendered_expected_depth,
-                        gt_depth_tensor,
-                        combined_mask
-                    )
-                    depth_order_loss += local_loss * area.float()
-                    total_weight += area.float()
-
-                if total_weight.item() > 0:
-                    depth_order_loss = depth_order_loss / total_weight
-                else:
-                    depth_order_loss = torch.tensor(0.0, device="cuda")
+                depth_order_loss = weighted_masked_pcc_loss(
+                    prior_depth=gt_depth_tensor,
+                    render_depth=rendered_expected_depth.squeeze(0),
+                    region_masks=sam_masks,
+                    prior_valid_mask=valid_mask,
+                    render_valid_mask=depth_mask,
+                    min_pixels=min_area,
+                    detach_align=False,
+                    return_aligned_prior=False,
+                )
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
