@@ -175,6 +175,7 @@ def weighted_masked_pcc_loss(
 
         block_loss = 1.0 - corr
         weight = n / total_pixels
+        print("block_loss", block_loss)
         total_loss = total_loss + weight * block_loss
 
     return total_loss
