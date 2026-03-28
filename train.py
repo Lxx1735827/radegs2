@@ -23,6 +23,7 @@ from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
+from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
@@ -210,15 +211,24 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
                 min_area = 100
-                depth_order_loss = weighted_masked_pcc_loss(
+                # depth_order_loss = weighted_masked_pcc_loss(
+                #     prior_depth=gt_depth_tensor,
+                #     render_depth=rendered_expected_depth,
+                #     region_masks=sam_masks,
+                #     prior_valid_mask=valid_mask,
+                #     render_valid_mask=depth_mask,
+                #     min_pixels=min_area,
+                #     detach_align=False,
+                #     return_aligned_prior=False,
+                # )
+                depth_order_loss = weighted_masked_l1_loss(
                     prior_depth=gt_depth_tensor,
                     render_depth=rendered_expected_depth,
                     region_masks=sam_masks,
                     prior_valid_mask=valid_mask,
                     render_valid_mask=depth_mask,
-                    min_pixels=min_area,
+                    min_pixels=5,
                     detach_align=False,
-                    return_aligned_prior=False,
                 )
 
             else:
