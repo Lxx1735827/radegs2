@@ -139,7 +139,6 @@ def weighted_masked_pcc_loss(
         if n >= min_pixels:
             valid_infos.append((i, valid, n))
             total_pixels += n
-    print("有效mask", total_pixels)
 
     if total_pixels == 0:
         zero_loss = torch.tensor(0.0, device=device, dtype=dtype)
@@ -175,7 +174,6 @@ def weighted_masked_pcc_loss(
 
         block_loss = 1.0 - corr
         weight = n / total_pixels
-        print("block_loss", block_loss)
         total_loss = total_loss + weight * block_loss
 
     return total_loss
