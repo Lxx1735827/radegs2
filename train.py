@@ -22,6 +22,7 @@ from tqdm import tqdm
 from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
+from utils.align import weighted_masked_pcc_loss
 from utils.depth_order import compute_depth_order_loss
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
@@ -208,22 +209,18 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
-                depth_order_loss = torch.tensor(0.0, device="cuda")
                 total_weight = torch.tensor(0.0, device="cuda")
-                min_area = 1000
-                for sam_mask in sam_masks:
-                    combined_mask = depth_mask & valid_mask & sam_mask
-                    area = combined_mask.sum()
-                    if area.item() < min_area:
-                        continue
-                    local_loss = compute_depth_order_loss(
-                        rendered_expected_depth,
-                        gt_depth_tensor,
-                        combined_mask
-                    )
-                    depth_order_loss += local_loss * area.float()
-                    total_weight += area.float()
-
+                min_area = 100
+                depth_order_loss = weighted_masked_pcc_loss(
+                    prior_depth=gt_depth_tensor,
+                    render_depth=rendered_expected_depth,
+                    region_masks=sam_masks,
+                    prior_valid_mask=valid_mask,
+                    render_valid_mask=depth_mask,
+                    min_pixels=min_area,
+                    detach_align=True,
+                    return_aligned_prior=False,
+                )
                 if total_weight.item() > 0:
                     depth_order_loss = depth_order_loss / total_weight
                 else:
