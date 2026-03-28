@@ -209,7 +209,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
-                min_area = 1000
+                min_area = 100
                 depth_order_loss = weighted_masked_pcc_loss(
                     prior_depth=gt_depth_tensor,
                     render_depth=rendered_expected_depth,
