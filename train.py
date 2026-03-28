@@ -209,7 +209,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
-                total_weight = torch.tensor(0.0, device="cuda")
                 min_area = 1000
                 depth_order_loss = weighted_masked_pcc_loss(
                     prior_depth=gt_depth_tensor,
@@ -221,10 +220,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     detach_align=False,
                     return_aligned_prior=False,
                 )
-                if total_weight.item() > 0:
-                    depth_order_loss = depth_order_loss / total_weight
-                else:
-                    depth_order_loss = torch.tensor(0.0, device="cuda")
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
