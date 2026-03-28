@@ -25,6 +25,7 @@ from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
+from utils.global_align import weighted_global_aligned_pcc_loss
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 try:
@@ -221,13 +222,22 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 #     detach_align=False,
                 #     return_aligned_prior=False,
                 # )
-                depth_order_loss = weighted_masked_l1_loss(
+                # depth_order_loss = weighted_masked_l1_loss(
+                #     prior_depth=gt_depth_tensor,
+                #     render_depth=rendered_expected_depth,
+                #     region_masks=sam_masks,
+                #     prior_valid_mask=valid_mask,
+                #     render_valid_mask=depth_mask,
+                #     min_pixels=5,
+                #     detach_align=False,
+                # )
+                depth_order_loss = weighted_global_aligned_pcc_loss(
                     prior_depth=gt_depth_tensor,
                     render_depth=rendered_expected_depth,
                     region_masks=sam_masks,
                     prior_valid_mask=valid_mask,
                     render_valid_mask=depth_mask,
-                    min_pixels=5,
+                    min_pixels=min_area,
                     detach_align=False,
                 )
 
