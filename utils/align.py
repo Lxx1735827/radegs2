@@ -139,6 +139,7 @@ def weighted_masked_pcc_loss(
         if n >= min_pixels:
             valid_infos.append((i, valid, n))
             total_pixels += n
+    pritn("有效mask", total_pixels)
 
     if total_pixels == 0:
         zero_loss = torch.tensor(0.0, device=device, dtype=dtype)
