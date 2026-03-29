@@ -247,7 +247,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 #     detach_align=False,
                 #     return_aligned_prior=False,
                 # )
-                pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
+                l1_loss = torch.abs(rendered_expected_depth - gt_depth_tensor)  # 计算 L1 损失
+
+                # 使用有效区域的 mask
+                l1_loss_masked = l1_loss * (depth_mask & valid_mask)  # 只保留有效区域的 L1 损失
+
+                # 计算有效区域的平均 L1 损失
+                pcc_depth_loss = torch.sum(l1_loss_masked) / torch.sum(depth_mask & valid_mask)  # 求平均
                 # depth_order_loss = pcc_loss(gt_depth_tensor, rendered_expected_depth, valid_mask, depth_mask, block_size=256)
                 # depth_order_loss = weighted_masked_l1_loss(
                 #     prior_depth=gt_depth_tensor,
