@@ -223,7 +223,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 #     detach_align=False,
                 #     return_aligned_prior=False,
                 # )
-                depth_order_loss = pcc_loss(gt_depth_tensor, rendered_expected_depth, valid_mask, depth_mask, block_size=64)
+                depth_order_loss = pcc_loss(gt_depth_tensor, rendered_expected_depth, valid_mask, depth_mask, block_size=256)
                 # depth_order_loss = weighted_masked_l1_loss(
                 #     prior_depth=gt_depth_tensor,
                 #     render_depth=rendered_expected_depth,
