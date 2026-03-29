@@ -72,7 +72,7 @@ def save_dir_segmentations(
     save_dir,
     mode="stack",
     sort_by_area=True,
-    erode_kernel=9,
+    erode_kernel=11,
     erode_iter=1,
     median_ksize=5,
     close_kernel=5,
@@ -144,23 +144,23 @@ def save_dir_segmentations(
                 erode_iter=erode_iter
             )
 
-            # 2. 腐蚀后的 mask -> 滤波
-            seg_filtered = filter_mask(
-                seg_bool=seg_eroded,
-                median_ksize=median_ksize,
-                close_kernel=close_kernel,
-                open_kernel=open_kernel
-            )
+            # # 2. 腐蚀后的 mask -> 滤波
+            # seg_filtered = filter_mask(
+            #     seg_bool=seg_eroded,
+            #     median_ksize=median_ksize,
+            #     close_kernel=close_kernel,
+            #     open_kernel=open_kernel
+            # )
+            #
+            # # 3. 从腐蚀+滤波后的 mask 提取边缘
+            # seg_edge = extract_edge_from_mask(
+            #     seg_bool=seg_filtered,
+            #     edge_kernel=edge_kernel,
+            #     edge_dilate_kernel=edge_dilate_kernel,
+            #     edge_dilate_iter=edge_dilate_iter
+            # )
 
-            # 3. 从腐蚀+滤波后的 mask 提取边缘
-            seg_edge = extract_edge_from_mask(
-                seg_bool=seg_filtered,
-                edge_kernel=edge_kernel,
-                edge_dilate_kernel=edge_dilate_kernel,
-                edge_dilate_iter=edge_dilate_iter
-            )
-
-            seg_list.append(seg_edge)
+            seg_list.append(seg_eroded)
 
         if mode == "stack":
             h, w = image.shape[:2]
