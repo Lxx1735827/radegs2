@@ -64,29 +64,29 @@ def L1_loss_appearance(image, gt_image, gaussians, view_idx, return_transformed_
         transformed_image = torch.nn.functional.interpolate(transformed_image, size=(origH, origW), mode="bilinear", align_corners=True)[0]
         return transformed_image
 
-def pcc_loss(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
-    if pred_depth.dim() == 3:
-        pred_depth = pred_depth.squeeze(0)
-    if gt_depth.dim() == 3:
-        gt_depth = gt_depth.squeeze(0)
-
-    mask = mask > 0
-
-    if mask.sum() < min_valid:
-        return torch.tensor(0.0, device=pred_depth.device)
-
-    pred = pred_depth[mask]
-    gt = gt_depth[mask]
-
-    pred = pred - pred.mean()
-    gt = gt - gt.mean()
-
-    pred_std = pred.std()
-    gt_std = gt.std()
-
-    corr = (pred * gt).mean() / (pred_std * gt_std + eps)
-
-    return 1.0 - corr
+# def pcc_loss(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
+#     if pred_depth.dim() == 3:
+#         pred_depth = pred_depth.squeeze(0)
+#     if gt_depth.dim() == 3:
+#         gt_depth = gt_depth.squeeze(0)
+#
+#     mask = mask > 0
+#
+#     if mask.sum() < min_valid:
+#         return torch.tensor(0.0, device=pred_depth.device)
+#
+#     pred = pred_depth[mask]
+#     gt = gt_depth[mask]
+#
+#     pred = pred - pred.mean()
+#     gt = gt - gt.mean()
+#
+#     pred_std = pred.std()
+#     gt_std = gt.std()
+#
+#     corr = (pred * gt).mean() / (pred_std * gt_std + eps)
+#
+#     return 1.0 - corr
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
