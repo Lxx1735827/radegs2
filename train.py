@@ -202,17 +202,16 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 depth_mask = render_pkg["mask"].squeeze() > 0
                 pcc_depth_loss = pcc_loss(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
                 min_area = 100
-                # depth_order_loss = weighted_masked_pcc_loss(
-                #     prior_depth=gt_depth_tensor,
-                #     render_depth=rendered_expected_depth.squeeze(0),
-                #     region_masks=sam_masks,
-                #     prior_valid_mask=valid_mask,
-                #     render_valid_mask=depth_mask,
-                #     min_pixels=min_area,
-                #     detach_align=False,
-                #     return_aligned_prior=False,
-                # )
-                depth_order_loss = torch.tensor(0.0, device="cuda")
+                depth_order_loss = weighted_masked_pcc_loss(
+                    prior_depth=gt_depth_tensor,
+                    render_depth=rendered_expected_depth.squeeze(0),
+                    region_masks=sam_masks,
+                    prior_valid_mask=valid_mask,
+                    render_valid_mask=depth_mask,
+                    min_pixels=min_area,
+                    detach_align=False,
+                    return_aligned_prior=False,
+                )
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
@@ -233,7 +232,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * pcc_depth_loss + 0.05 * depth_order_loss
+            loss = rgb_loss + 0.1 * pcc_depth_loss + 0.01 * depth_order_loss
         else:
             loss = rgb_loss
         loss.backward()

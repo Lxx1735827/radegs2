@@ -159,6 +159,8 @@ def weighted_masked_pcc_loss(
             a, b = fit_scale_shift_torch(prior_vals.detach(), render_vals.detach())
         else:
             a, b = fit_scale_shift_torch(prior_vals, render_vals)
+        a = 1
+        b = 0
 
         if a is None:
             continue
