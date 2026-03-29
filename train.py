@@ -64,7 +64,6 @@ def L1_loss_appearance(image, gt_image, gaussians, view_idx, return_transformed_
         transformed_image = torch.nn.functional.interpolate(transformed_image, size=(origH, origW), mode="bilinear", align_corners=True)[0]
         return transformed_image
 
-
 def compute_linear_transform_params(depth1, depth2, mask1, mask2):
     """
     计算将 depth1 转换为 depth2 的线性变换参数 a 和 b，通过最小二乘法拟合 y = ax + b。
@@ -84,21 +83,19 @@ def compute_linear_transform_params(depth1, depth2, mask1, mask2):
     valid_depth2 = depth2[valid_mask]
 
     if valid_depth1.numel() == 0 or valid_depth2.numel() == 0:
-        return torch.tensor(0.0), torch.tensor(0.0)  # 没有有效像素时返回0
+        return torch.tensor(0.0, device=depth1.device), torch.tensor(0.0, device=depth1.device)  # 没有有效像素时返回0
 
     # 计算线性变换参数 a 和 b (最小二乘法)
     # y = ax + b
-    # 通过最小二乘法解：a = (X^T * X)^(-1) * X^T * y
     A = torch.stack([valid_depth1, torch.ones_like(valid_depth1)], dim=1)  # 设计矩阵 [x, 1]
     b = valid_depth2  # 目标值
 
     # 最小二乘法解线性方程 A * [a, b]^T = b
-    params = torch.linalg.lstsq(A, b).solution  # 解得 a 和 b
+    params, _ = torch.linalg.lstsq(A, b)  # 仅获取解
     a = params[0]
     b = params[1]
 
     return a, b
-
 
 def pcc_loss2(depth1, depth2, mask1, mask2):
     """
@@ -133,8 +130,7 @@ def pcc_loss2(depth1, depth2, mask1, mask2):
 
     # 计算皮尔逊相关系数（PCC）
     numerator = torch.sum((valid_depth1 - mean_depth1) * (valid_depth2 - mean_depth2))
-    denominator = torch.sqrt(
-        torch.sum((valid_depth1 - mean_depth1) ** 2) * torch.sum((valid_depth2 - mean_depth2) ** 2))
+    denominator = torch.sqrt(torch.sum((valid_depth1 - mean_depth1) ** 2) * torch.sum((valid_depth2 - mean_depth2) ** 2))
 
     pcc = numerator / (denominator + 1e-6)  # 防止除零错误
 
@@ -244,10 +240,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             gt_depth = np.load(original_depth_dir + original_depth_file)
             gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
             valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
-            original_mask_dir = os.path.join(dataset.source_path, "mask/")
-            original_mask_file = viewpoint_cam.image_name + ".npy"
-            sam_masks = np.load(os.path.join(original_mask_dir, original_mask_file))
-            sam_masks = torch.from_numpy(sam_masks).to(torch.bool).to("cuda")
+            # original_mask_dir = os.path.join(dataset.source_path, "mask/")
+            # original_mask_file = viewpoint_cam.image_name + ".npy"
+            # sam_masks = np.load(os.path.join(original_mask_dir, original_mask_file))
+            # sam_masks = torch.from_numpy(sam_masks).to(torch.bool).to("cuda")
 
             lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
@@ -265,7 +261,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
-                min_area = 100
+                # min_area = 100
                 # depth_order_loss = weighted_masked_pcc_loss(
                 #     prior_depth=gt_depth_tensor,
                 #     render_depth=rendered_expected_depth,
@@ -277,7 +273,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 #     return_aligned_prior=False,
                 # )
                 pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask, depth_mask)
-                depth_order_loss = torch.tensor(0.0, device="cuda")
+                # depth_order_loss = torch.tensor(0.0, device="cuda")
                 # depth_order_loss = weighted_masked_l1_loss(
                 #     prior_depth=gt_depth_tensor,
                 #     render_depth=rendered_expected_depth,
@@ -302,7 +298,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_median_coord: torch.Tensor = render_pkg["median_coord"]
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
-                depth_order_loss = torch.tensor(0.0, device="cuda")
+                # depth_order_loss = torch.tensor(0.0, device="cuda")
                 pcc_depth_loss = torch.tensor(0.0, device="cuda")
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
@@ -310,13 +306,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
-            depth_order_loss = torch.tensor(0.0, device="cuda")
+            # depth_order_loss = torch.tensor(0.0, device="cuda")
             pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss + 0.1 * pcc_depth_loss
+            loss = rgb_loss + 0.1 * pcc_depth_loss
             if iteration % 100 == 0:
                 print(rgb_loss, depth_order_loss)
         else:
