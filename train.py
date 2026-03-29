@@ -26,6 +26,7 @@ from utils.align import weighted_masked_pcc_loss
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from utils.global_align import weighted_global_aligned_pcc_loss
+from utils.block_pcc import pcc_loss
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 try:
@@ -212,16 +213,17 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
                 min_area = 100
-                depth_order_loss = weighted_masked_pcc_loss(
-                    prior_depth=gt_depth_tensor,
-                    render_depth=rendered_expected_depth,
-                    region_masks=sam_masks,
-                    prior_valid_mask=valid_mask,
-                    render_valid_mask=depth_mask,
-                    min_pixels=min_area,
-                    detach_align=False,
-                    return_aligned_prior=False,
-                )
+                # depth_order_loss = weighted_masked_pcc_loss(
+                #     prior_depth=gt_depth_tensor,
+                #     render_depth=rendered_expected_depth,
+                #     region_masks=sam_masks,
+                #     prior_valid_mask=valid_mask,
+                #     render_valid_mask=depth_mask,
+                #     min_pixels=min_area,
+                #     detach_align=False,
+                #     return_aligned_prior=False,
+                # )
+                depth_order_loss = pcc_loss(gt_depth_tensor, rendered_expected_depth, valid_mask, depth_mask, block_size=64)
                 # depth_order_loss = weighted_masked_l1_loss(
                 #     prior_depth=gt_depth_tensor,
                 #     render_depth=rendered_expected_depth,
