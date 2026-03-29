@@ -154,21 +154,21 @@ def weighted_masked_pcc_loss(
         prior_vals = prior_depth[valid]    # source
         render_vals = render_depth[valid]  # target
 
-        # 先验深度 -> 对齐到渲染深度
-        if detach_align:
-            a, b = fit_scale_shift_torch(prior_vals.detach(), render_vals.detach())
-        else:
-            a, b = fit_scale_shift_torch(prior_vals, render_vals)
-
-        if a is None:
-            continue
-
-        aligned_vals = a * prior_vals + b
+        # # 先验深度 -> 对齐到渲染深度
+        # if detach_align:
+        #     a, b = fit_scale_shift_torch(prior_vals.detach(), render_vals.detach())
+        # else:
+        #     a, b = fit_scale_shift_torch(prior_vals, render_vals)
+        #
+        # if a is None:
+        #     continue
+        #
+        # aligned_vals = a * prior_vals + b
 
         if return_aligned_prior:
-            aligned_prior[valid] = aligned_vals
+            aligned_prior[valid] = prior_vals
 
-        corr = pearson_corr_torch(aligned_vals, render_vals, eps=eps)
+        corr = pearson_corr_torch(prior_vals, render_vals, eps=eps)
         if corr is None:
             continue
 
