@@ -91,11 +91,14 @@ def compute_linear_transform_params(depth1, depth2, mask1, mask2):
     b = valid_depth2  # 目标值
 
     # 最小二乘法解线性方程 A * [a, b]^T = b
-    params, _ = torch.linalg.lstsq(A, b)  # 仅获取解
+    result = torch.linalg.lstsq(A, b)  # 获取返回的解
+    params = result.solution  # 通过 .solution 获取解
+
     a = params[0]
     b = params[1]
 
     return a, b
+
 
 def pcc_loss2(depth1, depth2, mask1, mask2):
     """
