@@ -64,29 +64,29 @@ def L1_loss_appearance(image, gt_image, gaussians, view_idx, return_transformed_
         transformed_image = torch.nn.functional.interpolate(transformed_image, size=(origH, origW), mode="bilinear", align_corners=True)[0]
         return transformed_image
 
-# def pcc_loss(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
-#     if pred_depth.dim() == 3:
-#         pred_depth = pred_depth.squeeze(0)
-#     if gt_depth.dim() == 3:
-#         gt_depth = gt_depth.squeeze(0)
-#
-#     mask = mask > 0
-#
-#     if mask.sum() < min_valid:
-#         return torch.tensor(0.0, device=pred_depth.device)
-#
-#     pred = pred_depth[mask]
-#     gt = gt_depth[mask]
-#
-#     pred = pred - pred.mean()
-#     gt = gt - gt.mean()
-#
-#     pred_std = pred.std()
-#     gt_std = gt.std()
-#
-#     corr = (pred * gt).mean() / (pred_std * gt_std + eps)
-#
-#     return 1.0 - corr
+def pcc_loss2(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
+    if pred_depth.dim() == 3:
+        pred_depth = pred_depth.squeeze(0)
+    if gt_depth.dim() == 3:
+        gt_depth = gt_depth.squeeze(0)
+
+    mask = mask > 0
+
+    if mask.sum() < min_valid:
+        return torch.tensor(0.0, device=pred_depth.device)
+
+    pred = pred_depth[mask]
+    gt = gt_depth[mask]
+
+    pred = pred - pred.mean()
+    gt = gt - gt.mean()
+
+    pred_std = pred.std()
+    gt_std = gt.std()
+
+    corr = (pred * gt).mean() / (pred_std * gt_std + eps)
+
+    return 1.0 - corr
 
 
 def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoint_iterations, checkpoint, debug_from):
@@ -223,6 +223,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 #     detach_align=False,
                 #     return_aligned_prior=False,
                 # )
+                pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, depth_mask & valid_mask)
                 depth_order_loss = pcc_loss(gt_depth_tensor, rendered_expected_depth, valid_mask, depth_mask, block_size=256)
                 # depth_order_loss = weighted_masked_l1_loss(
                 #     prior_depth=gt_depth_tensor,
@@ -249,6 +250,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
                 depth_order_loss = torch.tensor(0.0, device="cuda")
+                pcc_depth_loss = torch.tensor(0.0, device="cuda")
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
@@ -256,11 +258,12 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
             depth_order_loss = torch.tensor(0.0, device="cuda")
+            pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss
+            loss = rgb_loss + 0.1 * depth_order_loss + 0.1 * pcc_depth_loss
             if iteration % 100 == 0:
                 print(rgb_loss, depth_order_loss)
         else:
