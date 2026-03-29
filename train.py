@@ -247,10 +247,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 #     detach_align=False,
                 #     return_aligned_prior=False,
                 # )
-                l1_loss = torch.abs(rendered_expected_depth - gt_depth_tensor)  # 计算 L1 损失
+                l1_loss2 = torch.abs(rendered_expected_depth - gt_depth_tensor)  # 计算 L1 损失
 
                 # 使用有效区域的 mask
-                l1_loss_masked = l1_loss * (depth_mask & valid_mask)  # 只保留有效区域的 L1 损失
+                l1_loss_masked = l1_loss2 * (depth_mask & valid_mask)  # 只保留有效区域的 L1 损失
 
                 # 计算有效区域的平均 L1 损失
                 pcc_depth_loss = torch.sum(l1_loss_masked) / torch.sum(depth_mask & valid_mask)  # 求平均
