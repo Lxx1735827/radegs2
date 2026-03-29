@@ -21,6 +21,7 @@ import uuid
 from tqdm import tqdm
 from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
+from utils.align import weighted_masked_pcc_loss
 from argparse import ArgumentParser, Namespace
 from arguments import ModelParams, PipelineParams, OptimizationParams
 try:
@@ -179,12 +180,19 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             gt_depth = np.load(original_depth_dir + original_depth_file)
             gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
             valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
+
             original_normal_file = viewpoint_cam.image_name + ".npy"
             original_normal_dir = os.path.join(dataset.source_path, "normal/")
             gt_normal = np.load(original_normal_dir + original_normal_file)
             gt_normal_tensor = torch.tensor(gt_normal, dtype=torch.float32, device="cuda")
             gt_normal_tensor = gt_normal_tensor.permute(2, 0, 1)
             gt_normal_tensor = gt_normal_tensor / gt_normal_tensor.norm(p=2, dim=1, keepdim=True)
+
+            original_mask_dir = os.path.join(dataset.source_path, "mask/")
+            original_mask_file = viewpoint_cam.image_name + ".npy"
+            sam_masks = np.load(os.path.join(original_mask_dir, original_mask_file))
+            sam_masks = torch.from_numpy(sam_masks).to(torch.bool).to("cuda")
+
             lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
                 rendered_expected_depth: torch.Tensor = render_pkg["expected_depth"]
@@ -192,8 +200,17 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
-                combined_mask = depth_mask & valid_mask
-                pcc_depth_loss = pcc_loss(rendered_expected_depth, gt_depth_tensor, combined_mask)
+                min_area = 100
+                pcc_depth_loss = weighted_masked_pcc_loss(
+                    prior_depth=gt_depth_tensor,
+                    render_depth=rendered_expected_depth.squeeze(0),
+                    region_masks=sam_masks,
+                    prior_valid_mask=valid_mask,
+                    render_valid_mask=depth_mask,
+                    min_pixels=min_area,
+                    detach_align=False,
+                    return_aligned_prior=False,
+                )
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
                 rendered_median_coord: torch.Tensor = render_pkg["median_coord"]
