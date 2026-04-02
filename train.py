@@ -246,6 +246,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     min_pixels=min_area,
                     return_aligned_prior=False,
                 )
+                pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
@@ -266,9 +267,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss
+            loss = rgb_loss + 0.1 * depth_order_loss + 0.1 * pcc_depth_loss
             if iteration % 10 ==0:
-                print(rgb_loss, depth_order_loss)
+                print(rgb_loss, depth_order_loss, pcc_depth_loss)
         else:
             loss = rgb_loss
         loss.backward()
