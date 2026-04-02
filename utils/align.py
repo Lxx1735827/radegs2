@@ -72,7 +72,6 @@ def weighted_masked_pcc_loss(
     render_valid_mask=None,
     min_pixels=10,
     eps=1e-8,
-    detach_align=True,
     return_aligned_prior=False,
 ):
     """
@@ -92,8 +91,6 @@ def weighted_masked_pcc_loss(
         每个块最少有效像素数
     eps: float
         数值稳定项
-    detach_align: bool
-        True: 拟合对齐参数(a,b)时不参与梯度，通常更稳
     return_aligned_prior: bool
         是否返回对齐后的先验深度图
 
@@ -154,21 +151,18 @@ def weighted_masked_pcc_loss(
         prior_vals = prior_depth[valid]    # source
         render_vals = render_depth[valid]  # target
 
-        # # 先验深度 -> 对齐到渲染深度
-        # if detach_align:
-        #     a, b = fit_scale_shift_torch(prior_vals.detach(), render_vals.detach())
-        # else:
-        #     a, b = fit_scale_shift_torch(prior_vals, render_vals)
-        #
-        # if a is None:
-        #     continue
-        #
-        # aligned_vals = a * prior_vals + b
+        # 先验深度 -> 对齐到渲染深度
+        a, b = fit_scale_shift_torch(prior_vals, render_vals)
+
+        if a is None:
+            continue
+
+        aligned_vals = a * prior_vals + b
 
         if return_aligned_prior:
-            aligned_prior[valid] = prior_vals
+            aligned_prior[valid] = aligned_vals
 
-        corr = pearson_corr_torch(prior_vals, render_vals, eps=eps)
+        corr = pearson_corr_torch(aligned_vals, render_vals, eps=eps)
         if corr is None:
             continue
 
