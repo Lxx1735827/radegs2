@@ -74,12 +74,7 @@ def save_dir_segmentations(
     sort_by_area=True,
     erode_kernel=13,
     erode_iter=1,
-    median_ksize=5,
-    close_kernel=5,
-    open_kernel=3,
-    edge_kernel=5,
-    edge_dilate_kernel=0,
-    edge_dilate_iter=0
+    threshold_pix = 10000
 ):
     """
     输入图片目录，批量生成 segmentation，并按以下流程保存：
@@ -143,8 +138,8 @@ def save_dir_segmentations(
                 erode_kernel=erode_kernel,
                 erode_iter=erode_iter
             )
-
-            seg_list.append(seg_eroded)
+            if seg_eroded.sum() > threshold_pix:
+                seg_list.append(seg_eroded)
 
         if mode == "stack":
             h, w = image.shape[:2]
