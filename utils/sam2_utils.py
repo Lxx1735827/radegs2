@@ -72,9 +72,9 @@ def save_dir_segmentations(
     save_dir,
     mode="stack",
     sort_by_area=True,
-    erode_kernel=13,
+    erode_kernel=20,
     erode_iter=1,
-    threshold_pix = 10000
+    threshold_pix = 20000
 ):
     """
     输入图片目录，批量生成 segmentation，并按以下流程保存：
