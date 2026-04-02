@@ -99,8 +99,6 @@ def pcc_loss2(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
 
     pred = pred_depth[mask]
     gt = gt_depth[mask]
-    a, b = fit_scale_shift_torch(pred, gt)
-    pred = a * pred + b
 
     pred = pred - pred.mean()
     gt = gt - gt.mean()
