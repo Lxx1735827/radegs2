@@ -244,7 +244,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     prior_valid_mask=valid_mask,
                     render_valid_mask=depth_mask,
                     min_pixels=min_area,
-                    detach_align=False,
                     return_aligned_prior=False,
                 )
                 # l1_loss2 = torch.abs(rendered_expected_depth - gt_depth_tensor)  # 计算 L1 损失
