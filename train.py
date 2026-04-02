@@ -246,32 +246,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     min_pixels=min_area,
                     return_aligned_prior=False,
                 )
-                # l1_loss2 = torch.abs(rendered_expected_depth - gt_depth_tensor)  # 计算 L1 损失
-
-                # 使用有效区域的 mask
-                # l1_loss_masked = l1_loss2 * (depth_mask & valid_mask)  # 只保留有效区域的 L1 损失
-
-                # 计算有效区域的平均 L1 损失
-                # pcc_depth_loss = torch.sum(l1_loss_masked) / torch.sum(depth_mask & valid_mask)  # 求平均
-                # depth_order_loss = pcc_loss(gt_depth_tensor, rendered_expected_depth, valid_mask, depth_mask, block_size=256)
-                # depth_order_loss = weighted_masked_l1_loss(
-                #     prior_depth=gt_depth_tensor,
-                #     render_depth=rendered_expected_depth,
-                #     region_masks=sam_masks,
-                #     prior_valid_mask=valid_mask,
-                #     render_valid_mask=depth_mask,
-                #     min_pixels=5,
-                #     detach_align=False,
-                # )
-                # depth_order_loss = weighted_global_aligned_pcc_loss(
-                #     prior_depth=gt_depth_tensor,
-                #     render_depth=rendered_expected_depth,
-                #     region_masks=sam_masks,
-                #     prior_valid_mask=valid_mask,
-                #     render_valid_mask=depth_mask,
-                #     min_pixels=min_area,
-                #     detach_align=False,
-                # )
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
@@ -293,7 +267,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         if iteration > opt.iterations * 0.5:
             loss = rgb_loss + 0.1 * depth_order_loss
-            print(rgb_loss, depth_order_loss)
+            if iteration % 10 ==0:
+                print(rgb_loss, depth_order_loss)
         else:
             loss = rgb_loss
         loss.backward()
