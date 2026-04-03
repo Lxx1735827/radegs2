@@ -94,27 +94,29 @@ def fit_scale_shift_torch(source, target):
 
         return a, b
 
-# def fit_scale_shift_torch(source, target):
-#     """
-#     最小二乘拟合:
-#         aligned = a * source + b
-#     使 source 对齐到 target
-#     source, target: [K]
-#     """
-#     x = source.reshape(-1).float()
-#     y = target.reshape(-1).float()
-#
-#     valid = torch.isfinite(x) & torch.isfinite(y)
-#     x = x[valid]
-#     y = y[valid]
-#
-#     if x.numel() < 2:
-#         return None, None
-#
-#     A = torch.stack([x, torch.ones_like(x)], dim=1)  # [K, 2]
-#     sol = torch.linalg.lstsq(A, y.unsqueeze(1)).solution.squeeze(1)
-#     a, b = sol[0], sol[1]
-#     return a, b
+def fit_scale_shift_torch(source, target):
+    """
+    最小二乘拟合:
+        aligned = a * source + b
+    使 source 对齐到 target
+    source, target: [K]
+    """
+    with torch.no_grad():
+        x = source.reshape(-1).float()
+        y = target.reshape(-1).float()
+
+        valid = torch.isfinite(x) & torch.isfinite(y)
+        x = x[valid]
+        y = y[valid]
+
+        if x.numel() < 2:
+            return None, None
+
+        A = torch.stack([x, torch.ones_like(x)], dim=1)  # [K, 2]
+        sol = torch.linalg.lstsq(A, y.unsqueeze(1)).solution.squeeze(1)
+        a, b = sol[0], sol[1]
+        return a, b
+    return 1, 0
 
 
 def pearson_corr_torch(x, y, eps=1e-8):

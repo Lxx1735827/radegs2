@@ -105,7 +105,7 @@ def save_dir_segmentations(
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     sam2 = build_sam2(model_cfg, checkpoint, device=device)
-    mask_generator = SAM2AutomaticMaskGenerator(sam2)
+    mask_generator = SAM2AutomaticMaskGenerator(sam2, box_nms_thresh = 0.3)
 
     for fname in os.listdir(image_dir):
         if not fname.lower().endswith((".jpg", ".png", ".jpeg")):
