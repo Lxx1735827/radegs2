@@ -21,25 +21,99 @@ def load_mask_list_torch(masks):
 
 def fit_scale_shift_torch(source, target):
     """
-    最小二乘拟合:
-        aligned = a * source + b
-    使 source 对齐到 target
-    source, target: [K]
+    全程 no_grad + RANSAC 鲁棒拟合
+    不会产生任何计算图 → 绝对不爆显存
+    对齐公式：aligned = a * source + b
     """
-    x = source.reshape(-1).float()
-    y = target.reshape(-1).float()
+    # 🔥 整个函数全部在 no_grad 里运行！
+    with torch.no_grad():
+        x = source.reshape(-1).float()
+        y = target.reshape(-1).float()
 
-    valid = torch.isfinite(x) & torch.isfinite(y)
-    x = x[valid]
-    y = y[valid]
+        # 过滤无效值
+        valid = torch.isfinite(x) & torch.isfinite(y)
+        x = x[valid]
+        y = y[valid]
 
-    if x.numel() < 2:
-        return None, None
+        # 点数不够直接返回
+        if x.numel() < 30:
+            return None, None
 
-    A = torch.stack([x, torch.ones_like(x)], dim=1)  # [K, 2]
-    sol = torch.linalg.lstsq(A, y.unsqueeze(1)).solution.squeeze(1)
-    a, b = sol[0], sol[1]
-    return a, b
+        # 转到 numpy 做 RANSAC（完全无梯度）
+        x_np = x.detach().cpu().numpy()
+        y_np = y.detach().cpu().numpy()
+
+        best_a = 1.0
+        best_b = 0.0
+        max_inliers = 0
+        inlier_thresh = 0.1  # 深度误差阈值（根据你的场景调整）
+
+        # RANSAC 迭代
+        for _ in range(40):
+            # 随机采样 4 点
+            idx = np.random.choice(len(x_np), 4, replace=False)
+            xs = x_np[idx]
+            ys = y_np[idx]
+
+            # 最小二乘
+            A = np.stack([xs, np.ones_like(xs)], axis=1)
+            sol = np.linalg.lstsq(A, ys[:, None], rcond=None)[0].ravel()
+            a_, b_ = sol[0], sol[1]
+
+            # 算内点
+            err = np.abs(a_ * x_np + b_ - y_np)
+            cnt = np.sum(err < inlier_thresh)
+
+            # 更新最佳模型
+            if cnt > max_inliers:
+                max_inliers = cnt
+                best_a = a_
+                best_b = b_
+
+        # 内点太少则失败
+        if max_inliers < 20:
+            return None, None
+
+        # 用内点重新精拟合
+        inlier_mask = np.abs(best_a * x_np + best_b - y_np) < inlier_thresh
+        x_in = x_np[inlier_mask]
+        y_in = y_np[inlier_mask]
+
+        A = np.stack([x_in, np.ones_like(x_in)], axis=1)
+        sol = np.linalg.lstsq(A, y_in[:, None], rcond=None)[0].ravel()
+        best_a, best_b = sol[0], sol[1]
+
+        # 转回 torch
+        a = torch.tensor(best_a, device=source.device, dtype=torch.float32)
+        b = torch.tensor(best_b, device=source.device, dtype=torch.float32)
+
+        # 安全裁剪
+        a = torch.clamp(a, 0.01, 100.0)
+        b = torch.clamp(b, -10.0, 10.0)
+
+        return a, b
+
+# def fit_scale_shift_torch(source, target):
+#     """
+#     最小二乘拟合:
+#         aligned = a * source + b
+#     使 source 对齐到 target
+#     source, target: [K]
+#     """
+#     x = source.reshape(-1).float()
+#     y = target.reshape(-1).float()
+#
+#     valid = torch.isfinite(x) & torch.isfinite(y)
+#     x = x[valid]
+#     y = y[valid]
+#
+#     if x.numel() < 2:
+#         return None, None
+#
+#     A = torch.stack([x, torch.ones_like(x)], dim=1)  # [K, 2]
+#     sol = torch.linalg.lstsq(A, y.unsqueeze(1)).solution.squeeze(1)
+#     a, b = sol[0], sol[1]
+#     return a, b
 
 
 def pearson_corr_torch(x, y, eps=1e-8):
