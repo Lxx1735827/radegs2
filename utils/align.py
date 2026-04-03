@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def load_mask_list_torch(masks):
