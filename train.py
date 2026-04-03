@@ -289,8 +289,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     min_pixels=min_area,
                     return_aligned_prior=False,
                 )
-                pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
-                # pcc_depth_loss = torch.tensor(0.0, device="cuda")
+                # pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
+                pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
