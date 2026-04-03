@@ -246,13 +246,13 @@ def weighted_masked_pcc_loss(
         render_inv = 1.0 / (render_vals + 1e-8)
 
         # 逆深度 L1
-        # block_loss = torch.abs(render_inv - prior_inv).mean()
-        pcc_loss = pearson_corr_torch(prior_inv, render_inv, eps=eps)
+        block_loss = torch.abs(render_inv - prior_inv).mean()
+        # pcc_loss = pearson_corr_torch(prior_inv, render_inv, eps=eps)
         if pcc_loss is None:
             continue
 
         # block_loss = 1.0 - corr
         weight = n / total_pixels
-        total_loss = total_loss + weight * pcc_loss
+        total_loss = total_loss + weight * block_loss
 
     return total_loss
