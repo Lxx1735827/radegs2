@@ -221,15 +221,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
                 rendered_expected_depth: torch.Tensor = render_pkg["expected_depth"].squeeze(0)
-                # if iteration == 2900:
-                #     save_dir = os.path.join(dataset.model_path, "debug_expected_depth")
-                #     os.makedirs(save_dir, exist_ok=True)
-                #
-                #     expected_depth_np = rendered_expected_depth.detach().squeeze().cpu().numpy()
-                #     np.save(
-                #         os.path.join(save_dir, f"{viewpoint_cam.image_name}_iter2900.npy"),
-                #         expected_depth_np
-                #     )
+                if iteration == 2900:
+                    save_dir = os.path.join(dataset.model_path, "debug_expected_depth")
+                    os.makedirs(save_dir, exist_ok=True)
+
+                    expected_depth_np = rendered_expected_depth.detach().squeeze().cpu().numpy()
+                    np.save(
+                        os.path.join(save_dir, f"{viewpoint_cam.image_name}_iter2900.npy"),
+                        expected_depth_np
+                    )
                 rendered_median_depth: torch.Tensor = render_pkg["median_depth"]
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
