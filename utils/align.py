@@ -240,7 +240,7 @@ def weighted_masked_pcc_loss(
             aligned_prior[valid] = aligned_vals
 
         # corr = pearson_corr_torch(aligned_vals, render_vals, eps=eps)
-        corr = torch.abs(aligned_vals - render_vals)
+        corr = torch.abs(aligned_vals - render_vals).mean()
         if corr is None:
             continue
 
