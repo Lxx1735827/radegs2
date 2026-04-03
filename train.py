@@ -86,20 +86,66 @@ def fit_scale_shift_torch(source, target):
     a, b = sol[0], sol[1]
     return a, b
 
-def pcc_loss2(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
+def fit_scale_shift_torch(source, target):
+    """
+    最小二乘拟合：aligned = a * source + b
+    全程 no_grad，不建立计算图，不爆显存
+    """
+    with torch.no_grad():
+        x = source.reshape(-1).float()
+        y = target.reshape(-1).float()
+
+        # 过滤无效值
+        valid = torch.isfinite(x) & torch.isfinite(y)
+        x = x[valid]
+        y = y[valid]
+
+        # 点不够直接返回
+        if x.numel() < 2:
+            return None, None
+
+        # 最小二乘（纯 PyTorch，最快最稳）
+        A = torch.stack([x, torch.ones_like(x)], dim=1)
+        sol = torch.linalg.lstsq(A, y.unsqueeze(1), rcond=1e-6).solution.squeeze(1)
+        a, b = sol[0], sol[1]
+
+        # 安全裁剪
+        a = torch.clamp(a, 0.01, 100.0)
+        b = torch.clamp(b, -10.0, 10.0)
+
+        return a, b
+
+
+def pcc_loss2(
+    pred_depth,
+    gt_depth,
+    mask,
+    eps=1e-6,
+    min_valid=50,
+    apply_alignment=True  # ✅ 是否拟合对齐，默认开启
+):
+    # 维度处理
     if pred_depth.dim() == 3:
         pred_depth = pred_depth.squeeze(0)
     if gt_depth.dim() == 3:
         gt_depth = gt_depth.squeeze(0)
 
+    # 掩码
     mask = mask > 0
-
     if mask.sum() < min_valid:
         return torch.tensor(0.0, device=pred_depth.device)
 
     pred = pred_depth[mask]
     gt = gt_depth[mask]
 
+    # ===================== 最小二乘对齐（可选） =====================
+    if apply_alignment:
+        a, b = fit_scale_shift_torch(pred, gt)
+        if a is not None and b is not None:
+            pred = a * pred + b
+    # ===============================================================
+
+    # PCC 计算
     pred = pred - pred.mean()
     gt = gt - gt.mean()
 
@@ -107,7 +153,6 @@ def pcc_loss2(pred_depth, gt_depth, mask, eps=1e-6, min_valid=50):
     gt_std = gt.std()
 
     corr = (pred * gt).mean() / (pred_std * gt_std + eps)
-
     return 1.0 - corr
 
 
@@ -244,8 +289,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     min_pixels=min_area,
                     return_aligned_prior=False,
                 )
-                # pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
-                pcc_depth_loss = torch.tensor(0.0, device="cuda")
+                pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
+                # pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
@@ -266,7 +311,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss
+            loss = rgb_loss + 0.1 * depth_order_loss + 0.05 * pcc_depth_loss
             if iteration % 10 ==0:
                 print(rgb_loss, depth_order_loss, pcc_depth_loss)
         else:
