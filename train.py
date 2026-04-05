@@ -91,7 +91,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     scene = Scene(dataset, gaussians)
     trian_source_path = os.path.join(dataset.source_path, "train")
     file_count = len(os.listdir(trian_source_path))
-    factor = file_count // 10 + 1
+    factor = file_count // 30 + 1
     opt.iterations = factor * 1000
     opt.position_lr_max_steps = factor * 1000
     opt.densify_until_iter = factor * 500
