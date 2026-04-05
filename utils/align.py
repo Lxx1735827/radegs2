@@ -239,20 +239,20 @@ def weighted_masked_pcc_loss(
         if return_aligned_prior:
             aligned_prior[valid] = aligned_vals
 
-        # pcc_loss = pearson_corr_torch(aligned_vals, render_vals, eps=eps)
+        pcc_loss = pearson_corr_torch(aligned_vals, render_vals, eps=eps)
         # block_loss = torch.abs(aligned_vals - render_vals).mean()
         # 取逆深度！核心就这两行
-        prior_inv = 1.0 / (aligned_vals + 1e-8)  # 逆深度
-        render_inv = 1.0 / (render_vals + 1e-8)
+        # prior_inv = 1.0 / (aligned_vals + 1e-8)  # 逆深度
+        # render_inv = 1.0 / (render_vals + 1e-8)
 
         # 逆深度 L1
-        block_loss = torch.abs(render_inv - prior_inv).mean()
+        # block_loss = torch.abs(render_inv - prior_inv).mean()
         # pcc_loss = pearson_corr_torch(prior_inv, render_inv, eps=eps)
-        if block_loss is None:
-            continue
+        # if pcc_loss is None:
+        #     continue
 
         # block_loss = 1.0 - corr
         weight = n / total_pixels
-        total_loss = total_loss + weight * block_loss
+        total_loss = total_loss + weight * pcc_loss
 
     return total_loss
