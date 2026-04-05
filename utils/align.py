@@ -251,7 +251,7 @@ def weighted_masked_pcc_loss(
         # if pcc_loss is None:
         #     continue
 
-        # block_loss = 1.0 - corr
+        pcc_loss = 1.0 - pcc_loss
         weight = n / total_pixels
         total_loss = total_loss + weight * pcc_loss
 
