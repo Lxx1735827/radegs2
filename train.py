@@ -312,8 +312,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         if iteration > opt.iterations * 0.5:
             loss = rgb_loss + 0.1 * depth_order_loss
-            if iteration % 10 ==0:
-                print(rgb_loss, depth_order_loss, pcc_depth_loss)
         else:
             loss = rgb_loss
         loss.backward()
