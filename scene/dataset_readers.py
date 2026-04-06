@@ -153,13 +153,49 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     sys.stdout.write('\n')
     return cam_infos
 
+# def fetchPly(path):
+#     plydata = PlyData.read(path)
+#     vertices = plydata['vertex']
+#     positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
+#     colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
+#     normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
+#     return BasicPointCloud(points=positions, colors=colors, normals=normals)
+
 def fetchPly(path):
     plydata = PlyData.read(path)
     vertices = plydata['vertex']
-    positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T
-    colors = np.vstack([vertices['red'], vertices['green'], vertices['blue']]).T / 255.0
-    normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T
-    return BasicPointCloud(points=positions, colors=colors, normals=normals)
+
+    names = vertices.data.dtype.names
+
+    positions = np.vstack([
+        vertices['x'],
+        vertices['y'],
+        vertices['z']
+    ]).T.astype(np.float32)
+
+    if all(k in names for k in ['red', 'green', 'blue']):
+        colors = np.vstack([
+            vertices['red'],
+            vertices['green'],
+            vertices['blue']
+        ]).T.astype(np.float32) / 255.0
+    else:
+        colors = np.ones((positions.shape[0], 3), dtype=np.float32)
+
+    if all(k in names for k in ['nx', 'ny', 'nz']):
+        normals = np.vstack([
+            vertices['nx'],
+            vertices['ny'],
+            vertices['nz']
+        ]).T.astype(np.float32)
+    else:
+        normals = np.zeros((positions.shape[0], 3), dtype=np.float32)
+
+    return BasicPointCloud(
+        points=positions,
+        colors=colors,
+        normals=normals
+    )
 
 def fetchOpen3DPly(path):
     plydata = o3d.io.read_point_cloud(path)
