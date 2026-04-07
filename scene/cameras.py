@@ -12,12 +12,34 @@
 import torch
 from torch import nn
 import numpy as np
-from utils.graphics_utils import getWorld2View2, getProjectionMatrix
+from utils.graphics_utils import getWorld2View2, getProjectionMatrix, fov2focal
+
+def getProjectionMatrix_refine(K: torch.Tensor, H, W, znear=0.001, zfar=1000):
+    fx = K[0, 0]
+    fy = K[1, 1]
+    cx = K[0, 2]
+    cy = K[1, 2]
+    s = K[0, 1]
+    P = torch.zeros(4, 4, dtype=K.dtype, device=K.device)
+    z_sign = 1.0
+
+    P[0, 0] = 2 * fx / W
+    P[0, 1] = 2 * s / W
+    P[0, 2] = -1 + 2 * (cx / W)
+
+    P[1, 1] = 2 * fy / H
+    P[1, 2] = -1 + 2 * (cy / H)
+
+    P[2, 2] = z_sign * (zfar + znear) / (zfar - znear)
+    P[2, 3] = -1 * z_sign * 2 * zfar * znear / (zfar - znear) # z_sign * 2 * zfar * znear / (zfar - znear)
+    P[3, 2] = z_sign
+
+    return P
 
 class Camera(nn.Module):
     def __init__(self, colmap_id, R, T, FoVx, FoVy, image, gt_alpha_mask,
                  image_name, uid,
-                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda",
+                 trans=np.array([0.0, 0.0, 0.0]), scale=1.0, data_device = "cuda", K=None
                  ):
         super(Camera, self).__init__()
 
@@ -39,6 +61,18 @@ class Camera(nn.Module):
         self.original_image = image.clamp(0.0, 1.0).to(self.data_device)
         self.image_width = self.original_image.shape[2]
         self.image_height = self.original_image.shape[1]
+        if K is not None:
+            self.K = K.astype(np.float32)
+            self.Fx = self.K[0, 0]
+            self.Fy = self.K[1, 1]
+            self.Cx = self.K[0, 2]
+            self.Cy = self.K[1, 2]
+        else:
+            self.K = None
+            self.Fx = fov2focal(FoVx, self.image_width)
+            self.Fy = fov2focal(FoVy, self.image_height)
+            self.Cx = 0.5 * self.image_width
+            self.Cy = 0.5 * self.image_height
 
         if gt_alpha_mask is not None:
             self.gt_mask = gt_alpha_mask.to(self.data_device)
@@ -52,7 +86,12 @@ class Camera(nn.Module):
         self.scale = scale
 
         self.world_view_transform = torch.tensor(getWorld2View2(R, T, trans, scale)).transpose(0, 1).cuda()
-        self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0,1).cuda()
+        # self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0,1).cuda()
+        if self.K is None:
+            self.projection_matrix = getProjectionMatrix(znear=self.znear, zfar=self.zfar, fovX=self.FoVx, fovY=self.FoVy).transpose(0,1).cuda()
+        else:
+            self.projection_matrix = getProjectionMatrix_refine(torch.Tensor(self.K), self.image_height, self.image_width, self.znear, self.zfar).transpose(0, 1).cuda()
+
         self.full_proj_transform = (self.world_view_transform.unsqueeze(0).bmm(self.projection_matrix.unsqueeze(0))).squeeze(0)
         self.camera_center = self.world_view_transform.inverse()[3, :3]
         # the edge calculation is adopted from https://github.com/autonomousvision/gaussian-opacity-fields/blob/main/train.py
