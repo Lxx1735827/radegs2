@@ -241,8 +241,7 @@ def weighted_masked_pcc_loss(
 
         pcc_loss = pearson_corr_torch(aligned_vals, render_vals, eps=eps)
         # block_loss = torch.abs(aligned_vals - render_vals).mean()
-        # 取逆深度！核心就这两行
-        # prior_inv = 1.0 / (aligned_vals + 1e-8)  # 逆深度
+        # prior_inv = 1.0 / (aligned_vals + 1e-8)
         # render_inv = 1.0 / (render_vals + 1e-8)
 
         # 逆深度 L1
