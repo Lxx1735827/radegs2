@@ -229,8 +229,9 @@ def weighted_masked_pcc_loss(
         render_vals = render_depth[valid]  # target
 
         # 先验深度 -> 对齐到渲染深度
-        a, b = fit_scale_shift_torch(prior_vals, render_vals)
-
+        # a, b = fit_scale_shift_torch(prior_vals, render_vals)
+        a = 1
+        b = 0
         if a is None:
             continue
 
