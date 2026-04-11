@@ -266,6 +266,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
                 rendered_expected_depth: torch.Tensor = render_pkg["expected_depth"].squeeze(0)
+                rendered_median_depth: torch.Tensor = render_pkg["median_depth"]
+                rendered_normal: torch.Tensor = render_pkg["normal"]
+                depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
+                depth_mask = render_pkg["mask"].squeeze() > 0
                 if iteration == 2900:
                     save_dir = os.path.join(dataset.model_path, "debug_expected_depth")
                     os.makedirs(save_dir, exist_ok=True)
@@ -275,10 +279,33 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         os.path.join(save_dir, f"{viewpoint_cam.image_name}_iter2900.npy"),
                         expected_depth_np
                     )
-                rendered_median_depth: torch.Tensor = render_pkg["median_depth"]
-                rendered_normal: torch.Tensor = render_pkg["normal"]
-                depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
-                depth_mask = render_pkg["mask"].squeeze() > 0
+
+                    # Saving valid_mask
+                    valid_mask_np = valid_mask.detach().cpu().numpy()
+                    save_dir = os.path.join(dataset.model_path, "debug_valid_mask")
+                    os.makedirs(save_dir, exist_ok=True)
+                    np.save(
+                        os.path.join(save_dir, f"{viewpoint_cam.image_name}_valid_mask_iter2900.npy"),
+                        valid_mask_np
+                    )
+
+                    # Saving sam_masks
+                    sam_masks_np = sam_masks.detach().cpu().numpy()
+                    save_dir = os.path.join(dataset.model_path, "debug_sam_masks")
+                    os.makedirs(save_dir, exist_ok=True)
+                    np.save(
+                        os.path.join(save_dir, f"{viewpoint_cam.image_name}_sam_masks_iter2900.npy"),
+                        sam_masks_np
+                    )
+
+                    # Saving depth_mask
+                    depth_mask_np = depth_mask.detach().cpu().numpy()
+                    save_dir = os.path.join(dataset.model_path, "debug_depth_mask")
+                    os.makedirs(save_dir, exist_ok=True)
+                    np.save(
+                        os.path.join(save_dir, f"{viewpoint_cam.image_name}_depth_mask_iter2900.npy"),
+                        depth_mask_np
+                    )
                 min_area = 100
                 depth_order_loss = weighted_masked_pcc_loss(
                     prior_depth=gt_depth_tensor,
