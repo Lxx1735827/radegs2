@@ -252,7 +252,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             Ll1_render = l1_loss(rendered_image, gt_image)
 
-        # reg_kick_on = False
+        reg_kick_on = False
         if reg_kick_on:
             original_depth_file = viewpoint_cam.image_name + ".npy"
             original_depth_dir = os.path.join(dataset.source_path, "depth/")
@@ -342,7 +342,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             scale = gaussians.get_scaling
             erank = get_effective_rank(scale)
             erank_loss = opt.erank_lambda * torch.clamp(-torch.log(erank - 1 + 1e-7), 0).mean()
-            loss = rgb_loss + 0.1 * depth_order_loss + 0.05 * erank_loss
+            loss = rgb_loss + 0.05 * erank_loss
             # loss = rgb_loss + 0.05 * erank_loss
         else:
             loss = rgb_loss
