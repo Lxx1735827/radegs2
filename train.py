@@ -335,7 +335,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             Ll1_render = l1_loss(rendered_image, gt_image)
 
-        # reg_kick_on = False
+        reg_kick_on = False
         if reg_kick_on:
             original_depth_file = viewpoint_cam.image_name + ".npy"
             original_depth_dir = os.path.join(dataset.source_path, "depth/")
