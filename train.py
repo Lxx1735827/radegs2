@@ -23,6 +23,7 @@ from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
+from utils.align_depth import align_all_depths
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from utils.global_align import weighted_global_aligned_pcc_loss
@@ -189,6 +190,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     original_image_dir = os.path.join(dataset.source_path, "images/")
     save_dir_segmentations(original_image_dir, original_mask_dir)
 
+    # 深度对齐
+
+
     if dataset.disable_filter3D:
         gaussians.reset_3D_filter()
     else:
@@ -251,7 +255,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             Ll1_render = l1_loss(rendered_image, gt_image)
 
-        reg_kick_on = False
+        # reg_kick_on = False
         if reg_kick_on:
             original_depth_file = viewpoint_cam.image_name + ".npy"
             original_depth_dir = os.path.join(dataset.source_path, "depth/")
