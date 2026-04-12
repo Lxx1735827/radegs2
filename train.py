@@ -23,6 +23,7 @@ from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
+from utils.erank import get_effective_rank
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from utils.global_align import weighted_global_aligned_pcc_loss
@@ -337,8 +338,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
+        scale = gaussians.get_scaling
+        erank = get_effective_rank(scale)
+        erank_loss = opt.erank_lambda * torch.clamp(-torch.log(erank - 1 + 1e-7), 0).mean()
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss
+            loss = rgb_loss + 0.1 * depth_order_loss + 0.05 * erank_loss
         else:
             loss = rgb_loss
         loss.backward()
