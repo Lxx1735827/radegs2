@@ -264,13 +264,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     save_dir_segmentations(original_image_dir, original_mask_dir)
 
     # 深度对齐
-    align_all_depths_with_blocks(os.path.join(dataset.source_path, "images/"),
-                                    os.path.join(dataset.source_path, "depth/"),
-                                    os.path.join(dataset.source_path, "mask/"),
-                                    os.path.join(dataset.source_path, "sparse/0/images.bin"),
-                                    os.path.join(dataset.source_path, "sparse/0/cameras.bin"),
-                                    os.path.join(dataset.source_path, "sparse/0/points3D.bin"),
-                                    os.path.join(dataset.source_path, "depth_align/"))
+    if not os.path.exists(os.path.join(dataset.source_path, "depth_align/")):
+        align_all_depths_with_blocks(os.path.join(dataset.source_path, "images/"),
+                                        os.path.join(dataset.source_path, "depth/"),
+                                        os.path.join(dataset.source_path, "mask/"),
+                                        os.path.join(dataset.source_path, "sparse/0/images.bin"),
+                                        os.path.join(dataset.source_path, "sparse/0/cameras.bin"),
+                                        os.path.join(dataset.source_path, "sparse/0/points3D.bin"),
+                                        os.path.join(dataset.source_path, "depth_align/"))
 
     if dataset.disable_filter3D:
         gaussians.reset_3D_filter()
@@ -399,7 +400,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     min_pixels_per_block=16,  # 可调：8 / 16 / 32
                     eps=1e-6,
                 )
-                if valid_block_count <= 0 or lambda_block_invdepth <= 0:
+                if valid_block_count <= 0:
                     block_invdepth_l1 = torch.tensor(0.0, device="cuda")
                 min_area = 100
                 # depth_order_loss = weighted_masked_pcc_loss(
