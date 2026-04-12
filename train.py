@@ -264,14 +264,14 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     save_dir_segmentations(original_image_dir, original_mask_dir)
 
     # 深度对齐
-    if not os.path.exists(os.path.join(dataset.source_path, "depth_align/")):
-        align_all_depths_with_blocks(os.path.join(dataset.source_path, "images/"),
-                                        os.path.join(dataset.source_path, "depth/"),
-                                        os.path.join(dataset.source_path, "mask/"),
-                                        os.path.join(dataset.source_path, "sparse/0/images.bin"),
-                                        os.path.join(dataset.source_path, "sparse/0/cameras.bin"),
-                                        os.path.join(dataset.source_path, "sparse/0/points3D.bin"),
-                                        os.path.join(dataset.source_path, "depth_align/"))
+    # if not os.path.exists(os.path.join(dataset.source_path, "depth_align/")):
+    #     align_all_depths_with_blocks(os.path.join(dataset.source_path, "images/"),
+    #                                     os.path.join(dataset.source_path, "depth/"),
+    #                                     os.path.join(dataset.source_path, "mask/"),
+    #                                     os.path.join(dataset.source_path, "sparse/0/images.bin"),
+    #                                     os.path.join(dataset.source_path, "sparse/0/cameras.bin"),
+    #                                     os.path.join(dataset.source_path, "sparse/0/points3D.bin"),
+    #                                     os.path.join(dataset.source_path, "depth_align/"))
 
     if dataset.disable_filter3D:
         gaussians.reset_3D_filter()
@@ -390,28 +390,28 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         os.path.join(save_dir, f"{viewpoint_cam.image_name}_depth_mask_iter2900.npy"),
                         depth_mask_np
                     )
-                extra_masks = [depth_mask]
-                block_invdepth_l1, valid_block_count = compute_blockwise_invdepth_l1(
-                    pred_depth=rendered_expected_depth,
-                    gt_depth=gt_depth_tensor,
-                    block_masks=sam_masks,
-                    base_valid_mask=valid_mask,
-                    extra_masks=extra_masks,
-                    min_pixels_per_block=16,  # 可调：8 / 16 / 32
-                    eps=1e-6,
-                )
-                if valid_block_count <= 0:
-                    block_invdepth_l1 = torch.tensor(0.0, device="cuda")
-                min_area = 100
-                # depth_order_loss = weighted_masked_pcc_loss(
-                #     prior_depth=gt_depth_tensor,
-                #     render_depth=rendered_expected_depth,
-                #     region_masks=sam_masks,
-                #     prior_valid_mask=valid_mask,
-                #     render_valid_mask=depth_mask,
-                #     min_pixels=min_area,
-                #     return_aligned_prior=False,
+                # extra_masks = [depth_mask]
+                # block_invdepth_l1, valid_block_count = compute_blockwise_invdepth_l1(
+                #     pred_depth=rendered_expected_depth,
+                #     gt_depth=gt_depth_tensor,
+                #     block_masks=sam_masks,
+                #     base_valid_mask=valid_mask,
+                #     extra_masks=extra_masks,
+                #     min_pixels_per_block=16,  # 可调：8 / 16 / 32
+                #     eps=1e-6,
                 # )
+                # if valid_block_count <= 0:
+                #     block_invdepth_l1 = torch.tensor(0.0, device="cuda")
+                min_area = 100
+                depth_order_loss = weighted_masked_pcc_loss(
+                    prior_depth=gt_depth_tensor,
+                    render_depth=rendered_expected_depth,
+                    region_masks=sam_masks,
+                    prior_valid_mask=valid_mask,
+                    render_valid_mask=depth_mask,
+                    min_pixels=min_area,
+                    return_aligned_prior=False,
+                )
 
                 # pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
                 pcc_depth_loss = torch.tensor(0.0, device="cuda")
@@ -439,7 +439,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * block_invdepth_l1
+            loss = rgb_loss + 0.1 * depth_order_loss
         else:
             loss = rgb_loss
         loss.backward()
