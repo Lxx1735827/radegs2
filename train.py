@@ -237,7 +237,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     scene = Scene(dataset, gaussians)
     trian_source_path = os.path.join(dataset.source_path, "train")
     file_count = len(os.listdir(trian_source_path))
-    factor = file_count // 30 + 1
+    factor = file_count // 20 + 1
     opt.iterations = factor * 1000
     opt.position_lr_max_steps = factor * 1000
     opt.densify_until_iter = factor * 500
@@ -438,10 +438,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
-        if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss
-        else:
-            loss = rgb_loss
+        # if iteration > opt.iterations * 0.5:
+        #     loss = rgb_loss + 0.1 * depth_order_loss
+        # else:
+        #     loss = rgb_loss
+        loss = rgb_loss
         loss.backward()
 
         iter_end.record()
