@@ -4,7 +4,18 @@ import os
 import struct
 import numpy as np
 
-
+def sanitize_depth_map(depth):
+    """
+    将深度图中的无效值统一处理:
+    - NaN / Inf / <=0 都视为无效
+    返回:
+        depth_clean: float32，原始无效值位置保留为 0
+        valid_mask: bool，有效深度位置为 True
+    """
+    depth = np.asarray(depth, dtype=np.float32).copy()
+    valid_mask = np.isfinite(depth) & (depth > 0)
+    depth[~valid_mask] = 0.0
+    return depth, valid_mask
 # =========================
 # 1. COLMAP binary 读取
 # =========================
@@ -194,7 +205,14 @@ def bilinear_sample(depth, xs, ys):
 
     out = wa * Ia + wb * Ib + wc * Ic + wd * Id
 
-    neighbor_valid = np.isfinite(Ia) & np.isfinite(Ib) & np.isfinite(Ic) & np.isfinite(Id)
+    # 关键：不仅要 finite，还要 > 0
+    neighbor_valid = (
+        np.isfinite(Ia) & (Ia > 0) &
+        np.isfinite(Ib) & (Ib > 0) &
+        np.isfinite(Ic) & (Ic > 0) &
+        np.isfinite(Id) & (Id > 0)
+    )
+
     sampled_valid = np.full(xv.shape, np.nan, dtype=np.float64)
     sampled_valid[neighbor_valid] = out[neighbor_valid]
     sampled[valid] = sampled_valid
@@ -372,6 +390,8 @@ def build_correspondences_for_image(image, camera, points3D, dense_depth, region
     返回:
         z_dense_valid, z_sparse_valid
     """
+    dense_depth, _ = sanitize_depth_map(dense_depth)
+
     R = image.qvec2rotmat()
     t = image.tvec.reshape(3, 1)
 
@@ -400,7 +420,7 @@ def build_correspondences_for_image(image, camera, points3D, dense_depth, region
         xyz_cam = (R @ xyz_world + t).reshape(3)
         z = float(xyz_cam[2])
 
-        if z <= 1e-8:
+        if not np.isfinite(z) or z <= 1e-8:
             continue
 
         x, y = float(xy[0]), float(xy[1])
@@ -429,7 +449,10 @@ def build_correspondences_for_image(image, camera, points3D, dense_depth, region
 
     z_dense = bilinear_sample(dense_depth.astype(np.float64), xs_dense, ys_dense)
 
-    valid = np.isfinite(z_dense) & np.isfinite(z_sparse) & (z_dense > 0) & (z_sparse > 0)
+    valid = (
+        np.isfinite(z_dense) & (z_dense > 0) &
+        np.isfinite(z_sparse) & (z_sparse > 0)
+    )
     return z_dense[valid], z_sparse[valid]
 
 
@@ -437,11 +460,25 @@ def build_correspondences_for_image(image, camera, points3D, dense_depth, region
 # 7. 应用 scale/shift
 # =========================
 
-def apply_scale_shift(depth, scale, shift):
-    out = depth.astype(np.float32).copy()
-    valid = np.isfinite(out) & (out > 0)
-    out[valid] = (scale * out[valid] + shift).astype(np.float32)
-    out[valid & (out <= 0)] = 0.0
+def apply_scale_shift(depth, scale, shift, invalid_fill=0.0):
+    """
+    只对有效深度(>0且finite)做 scale/shift
+    无效位置保持 invalid_fill，默认 0
+    """
+    depth = np.asarray(depth, dtype=np.float32)
+    out = np.full_like(depth, invalid_fill, dtype=np.float32)
+
+    valid = np.isfinite(depth) & (depth > 0)
+    if np.any(valid):
+        aligned = scale * depth[valid].astype(np.float64) + shift
+        aligned = aligned.astype(np.float32)
+
+        # 变换后如果<=0，也视为无效
+        aligned[~np.isfinite(aligned)] = invalid_fill
+        aligned[aligned <= 0] = invalid_fill
+
+        out[valid] = aligned
+
     return out
 
 
@@ -459,10 +496,11 @@ def align_one_depth_map_with_blocks(
     ransac_iters=1000,
     min_block_matches=6,
 ):
-    depth = np.load(depth_path)
-    if depth.ndim != 2:
-        raise ValueError(f"深度图必须是单通道 2D 数组，但 {depth_path} 的 shape={depth.shape}")
+    depth_raw = np.load(depth_path)
+    if depth_raw.ndim != 2:
+        raise ValueError(f"深度图必须是单通道 2D 数组，但 {depth_path} 的 shape={depth_raw.shape}")
 
+    depth, input_valid_mask = sanitize_depth_map(depth_raw)
     dep_h, dep_w = depth.shape
 
     # ---------- 1) 全局拟合 ----------
@@ -486,7 +524,7 @@ def align_one_depth_map_with_blocks(
         min_inlier_ratio=0.2,
     )
 
-    global_aligned = apply_scale_shift(depth, global_scale, global_shift)
+    global_aligned = apply_scale_shift(depth, global_scale, global_shift, invalid_fill=0.0)
 
     result_info = {
         "global_scale": float(global_scale),
@@ -571,8 +609,8 @@ def align_one_depth_map_with_blocks(
             num_inliers = 0
             result_info["num_global_fallback"] += 1
 
-        block_aligned = apply_scale_shift(depth, local_scale, local_shift)
-        valid_block = block_mask & np.isfinite(block_aligned) & (depth > 0)
+        block_aligned = apply_scale_shift(depth, local_scale, local_shift, invalid_fill=0.0)
+        valid_block = block_mask & input_valid_mask & np.isfinite(block_aligned) & (block_aligned > 0)
 
         accum[valid_block] += block_aligned[valid_block]
         weight[valid_block] += 1.0
@@ -597,9 +635,19 @@ def align_one_depth_map_with_blocks(
         result_info["block_infos"].append(block_info)
 
     # ---------- 4) 融合分块结果 ----------
-    final_aligned = global_aligned.copy()
+    final_aligned = np.zeros_like(depth, dtype=np.float32)
+
+    # 先放全局结果
+    final_aligned[input_valid_mask] = global_aligned[input_valid_mask]
+
+    # 被局部分块覆盖的位置，用局部融合值替换
     covered = weight > 0
     final_aligned[covered] = (accum[covered] / weight[covered]).astype(np.float32)
+
+    # 最后再强制把原始无效区域置 0
+    final_aligned[~input_valid_mask] = 0.0
+    final_aligned[~np.isfinite(final_aligned)] = 0.0
+    final_aligned[final_aligned <= 0] = 0.0
 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -627,6 +675,8 @@ def align_all_depths_with_blocks(
     depth_dir = Path(depth_dir)
     mask_dir = Path(mask_dir) if mask_dir is not None else None
     out_dir = Path(out_dir)
+    if not out_dir.exists():
+        out_dir.mkdir(parents=True, exist_ok=True)
 
     cameras = read_cameras_binary(cameras_bin)
     images = read_images_binary(images_bin)

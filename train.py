@@ -23,7 +23,7 @@ from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
-from utils.align_depth import align_all_depths
+from utils.align_depth import align_all_depths_with_blocks
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from utils.global_align import weighted_global_aligned_pcc_loss
@@ -40,6 +40,79 @@ import numpy as np
 from scene.cameras import Camera
 import matplotlib.pyplot as plt
 from utils.vis_utils import apply_depth_colormap
+
+import torch
+import torch.nn.functional as F
+
+
+def safe_inverse_depth(depth: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
+    """
+    depth: [H, W]
+    返回逆深度，自动避免除 0
+    """
+    return 1.0 / torch.clamp(depth, min=eps)
+
+
+def compute_blockwise_invdepth_l1(
+    pred_depth: torch.Tensor,
+    gt_depth: torch.Tensor,
+    block_masks: torch.Tensor,
+    base_valid_mask: torch.Tensor,
+    extra_masks=None,
+    min_pixels_per_block: int = 16,
+    eps: float = 1e-6,
+):
+    """
+    分块逆深度 L1
+
+    参数：
+        pred_depth:       [H, W] 渲染深度（建议 expected_depth）
+        gt_depth:         [H, W] 对齐后的 GT 深度（来自 depth_align）
+        block_masks:      [N, H, W] 或 [H, W]
+        base_valid_mask:  [H, W]，基础有效区域（比如 finite / >0 / render mask）
+        extra_masks:      额外掩码列表，每个都是 [H, W] bool
+        min_pixels_per_block: 一个块至少要有多少有效像素才参与
+    返回：
+        loss, valid_block_count
+    """
+    if pred_depth.ndim != 2 or gt_depth.ndim != 2:
+        raise ValueError(f"pred_depth 和 gt_depth 必须是 [H, W]，但 got {pred_depth.shape}, {gt_depth.shape}")
+
+    if block_masks.ndim == 2:
+        block_masks = block_masks.unsqueeze(0)   # -> [1, H, W]
+    elif block_masks.ndim != 3:
+        raise ValueError(f"block_masks 必须是 [H,W] 或 [N,H,W]，但 got {block_masks.shape}")
+
+    # 基础有效掩码
+    final_valid = base_valid_mask.clone()
+
+    if extra_masks is not None:
+        for m in extra_masks:
+            if m is not None:
+                final_valid = final_valid & m.bool()
+
+    # 逆深度
+    pred_inv = safe_inverse_depth(pred_depth, eps=eps)
+    gt_inv = safe_inverse_depth(gt_depth, eps=eps)
+
+    block_losses = []
+
+    for i in range(block_masks.shape[0]):
+        block_mask = block_masks[i].bool()
+        cur_mask = final_valid & block_mask
+
+        valid_pixels = cur_mask.sum().item()
+        if valid_pixels < min_pixels_per_block:
+            continue
+
+        block_l1 = torch.abs(pred_inv[cur_mask] - gt_inv[cur_mask]).mean()
+        block_losses.append(block_l1)
+
+    if len(block_losses) == 0:
+        return pred_depth.new_tensor(0.0), 0
+
+    loss = torch.stack(block_losses).mean()
+    return loss, len(block_losses)
 
 # function L1_loss_appearance is fork from GOF https://github.com/autonomousvision/gaussian-opacity-fields/blob/main/train.py
 def L1_loss_appearance(image, gt_image, gaussians, view_idx, return_transformed_image=False):
@@ -191,7 +264,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     save_dir_segmentations(original_image_dir, original_mask_dir)
 
     # 深度对齐
-
+    align_all_depths_with_blocks(os.path.join(dataset.source_path, "images/"),
+                                    os.path.join(dataset.source_path, "depth/"),
+                                    os.path.join(dataset.source_path, "mask/"),
+                                    os.path.join(dataset.source_path, "sparse/0/images.bin"),
+                                    os.path.join(dataset.source_path, "sparse/0/cameras.bin"),
+                                    os.path.join(dataset.source_path, "sparse/0/points3D.bin"),
+                                    os.path.join(dataset.source_path, "depth_align/"))
 
     if dataset.disable_filter3D:
         gaussians.reset_3D_filter()
@@ -258,7 +337,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # reg_kick_on = False
         if reg_kick_on:
             original_depth_file = viewpoint_cam.image_name + ".npy"
-            original_depth_dir = os.path.join(dataset.source_path, "depth/")
+            original_depth_dir = os.path.join(dataset.source_path, "depth_align/")
             gt_depth = np.load(original_depth_dir + original_depth_file)
             gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
             valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
@@ -310,16 +389,29 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         os.path.join(save_dir, f"{viewpoint_cam.image_name}_depth_mask_iter2900.npy"),
                         depth_mask_np
                     )
-                min_area = 100
-                depth_order_loss = weighted_masked_pcc_loss(
-                    prior_depth=gt_depth_tensor,
-                    render_depth=rendered_expected_depth,
-                    region_masks=sam_masks,
-                    prior_valid_mask=valid_mask,
-                    render_valid_mask=depth_mask,
-                    min_pixels=min_area,
-                    return_aligned_prior=False,
+                extra_masks = [depth_mask]
+                block_invdepth_l1, valid_block_count = compute_blockwise_invdepth_l1(
+                    pred_depth=rendered_expected_depth,
+                    gt_depth=gt_depth_tensor,
+                    block_masks=sam_masks,
+                    base_valid_mask=valid_mask,
+                    extra_masks=extra_masks,
+                    min_pixels_per_block=16,  # 可调：8 / 16 / 32
+                    eps=1e-6,
                 )
+                if valid_block_count <= 0 or lambda_block_invdepth <= 0:
+                    block_invdepth_l1 = torch.tensor(0.0, device="cuda")
+                min_area = 100
+                # depth_order_loss = weighted_masked_pcc_loss(
+                #     prior_depth=gt_depth_tensor,
+                #     render_depth=rendered_expected_depth,
+                #     region_masks=sam_masks,
+                #     prior_valid_mask=valid_mask,
+                #     render_valid_mask=depth_mask,
+                #     min_pixels=min_area,
+                #     return_aligned_prior=False,
+                # )
+
                 # pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
                 pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
@@ -330,6 +422,8 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
                 depth_order_loss = torch.tensor(0.0, device="cuda")
                 pcc_depth_loss = torch.tensor(0.0, device="cuda")
+                block_invdepth_l1 = torch.tensor(0.0, device="cuda")
+                valid_block_count = torch.tensor(0.0, device="cuda")
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
@@ -338,11 +432,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
             depth_order_loss = torch.tensor(0.0, device="cuda")
             pcc_depth_loss = torch.tensor(0.0, device="cuda")
+            block_invdepth_l1 = torch.tensor(0.0, device="cuda")
+            valid_block_count = torch.tensor(0.0, device="cuda")
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
         if iteration > opt.iterations * 0.5:
-            loss = rgb_loss + 0.1 * depth_order_loss
+            loss = rgb_loss + 0.1 * block_invdepth_l1
         else:
             loss = rgb_loss
         loss.backward()
