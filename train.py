@@ -338,7 +338,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         # reg_kick_on = False
         if reg_kick_on:
             original_depth_file = viewpoint_cam.image_name + ".npy"
-            original_depth_dir = os.path.join(dataset.source_path, "depth_align/")
+            original_depth_dir = os.path.join(dataset.source_path, "depth/")
             gt_depth = np.load(original_depth_dir + original_depth_file)
             gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
             valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
