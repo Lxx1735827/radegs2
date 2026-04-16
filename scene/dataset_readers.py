@@ -211,12 +211,12 @@ def readColmapSceneInfo(path, images, eval, llffhold=8):
             for f in os.listdir(test_path)
             if f.endswith(".jpg")
         ]
-        train_path = os.path.join(path, "train")
-        train_txt = [
-            os.path.splitext(f)[0]
-            for f in os.listdir(train_path)
-            if f.endswith(".jpg")
-        ]
+        # train_path = os.path.join(path, "train")
+        # train_txt = [
+        #     os.path.splitext(f)[0]
+        #     for f in os.listdir(train_path)
+        #     if f.endswith(".jpg")
+        # ]
         train_cam_infos = [c for c in cam_infos if c.image_name not in test_txt]
         test_cam_infos = [c for c in cam_infos if c.image_name in test_txt]
     else:
