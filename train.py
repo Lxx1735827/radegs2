@@ -64,16 +64,16 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     tb_writer = prepare_output_and_logger(dataset)
     gaussians = GaussianModel(dataset.sh_degree)
     scene = Scene(dataset, gaussians)
-    trian_source_path = os.path.join(dataset.source_path, "train")
-    file_count = len(os.listdir(trian_source_path))
-    factor = file_count // 25 + 1
-    opt.iterations = factor * 1000
-    opt.position_lr_max_steps = factor * 1000
-    opt.densify_until_iter = factor * 500
-    opt.regularization_from_iter = factor * 500
-    testing_iterations = [ i*500 for i in range(1, 2*factor+1)]
-    saving_iterations = [factor * 1000]
-    checkpoint_iterations = [factor * 500]
+    # trian_source_path = os.path.join(dataset.source_path, "train")
+    # file_count = len(os.listdir(trian_source_path))
+    # factor = file_count // 25 + 1
+    # opt.iterations = factor * 1000
+    # opt.position_lr_max_steps = factor * 1000
+    # opt.densify_until_iter = factor * 500
+    # opt.regularization_from_iter = factor * 500
+    # testing_iterations = [ i*500 for i in range(1, 2*factor+1)]
+    # saving_iterations = [factor * 1000]
+    # checkpoint_iterations = [factor * 500]
     gaussians.training_setup(opt)
     if checkpoint:
         (model_params, first_iter) = torch.load(checkpoint)
@@ -88,15 +88,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     trainCameras = scene.getTrainCameras().copy()
 
     # sam2分割
-    original_mask_dir = os.path.join(dataset.source_path, "mask/")
-    if not os.path.exists(original_mask_dir):
-        os.makedirs(original_mask_dir)
-        original_image_dir = os.path.join(dataset.source_path, "train/")
-        for fname in os.listdir(original_image_dir):
-            image_path = os.path.join(original_image_dir, fname)
-            base_name = os.path.splitext(fname)[0]
-            save_path = os.path.join(original_mask_dir, base_name + ".npy")
-            save_image_segmentations(image_path, save_path)
+    # original_mask_dir = os.path.join(dataset.source_path, "mask/")
+    # if not os.path.exists(original_mask_dir):
+    #     os.makedirs(original_mask_dir)
+    #     original_image_dir = os.path.join(dataset.source_path, "train/")
+    #     for fname in os.listdir(original_image_dir):
+    #         image_path = os.path.join(original_image_dir, fname)
+    #         base_name = os.path.splitext(fname)[0]
+    #         save_path = os.path.join(original_mask_dir, base_name + ".npy")
+    #         save_image_segmentations(image_path, save_path)
 
 
     if dataset.disable_filter3D:
