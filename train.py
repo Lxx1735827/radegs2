@@ -291,16 +291,16 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
 
                 min_area = 100
-                depth_order_loss = torch.tensor(0.0, device="cuda")
-                # depth_order_loss = weighted_masked_pcc_loss(
-                #     prior_depth=gt_depth_tensor,
-                #     render_depth=rendered_expected_depth,
-                #     region_masks=sam_masks,
-                #     prior_valid_mask=valid_mask,
-                #     render_valid_mask=depth_mask,
-                #     min_pixels=min_area,
-                #     return_aligned_prior=False,
-                # )
+                # depth_order_loss = torch.tensor(0.0, device="cuda")
+                depth_order_loss = weighted_masked_pcc_loss(
+                    prior_depth=gt_depth_tensor,
+                    render_depth=rendered_expected_depth,
+                    region_masks=sam_masks,
+                    prior_valid_mask=valid_mask,
+                    render_valid_mask=depth_mask,
+                    min_pixels=min_area,
+                    return_aligned_prior=False,
+                )
                 # pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
                 # pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
@@ -322,15 +322,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
-        # if iteration > 2000:
-        #     scale = gaussians.get_scaling
-        #     erank = get_effective_rank(scale)
-        #     erank_loss = opt.erank_lambda * torch.clamp(-torch.log(erank - 1 + 1e-7), 0).mean()
-        #     loss = rgb_loss + 0.1 * depth_order_loss + 0.05 * erank_loss
-        #     # loss = rgb_loss + 0.05 * erank_loss
-        # else:
-        #     loss = rgb_loss
-        loss = rgb_loss
+        if iteration > 2000:
+            scale = gaussians.get_scaling
+            erank = get_effective_rank(scale)
+            erank_loss = opt.erank_lambda * torch.clamp(-torch.log(erank - 1 + 1e-7), 0).mean()
+            loss = rgb_loss + 0.1 * depth_order_loss + 0.05 * erank_loss
+            # loss = rgb_loss + 0.05 * erank_loss
+        else:
+            loss = rgb_loss
+        # loss = rgb_loss
         loss.backward()
 
         iter_end.record()
