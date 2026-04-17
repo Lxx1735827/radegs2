@@ -264,7 +264,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             sam_masks = np.load(os.path.join(original_mask_dir, original_mask_file))
             sam_masks = torch.from_numpy(sam_masks).to(torch.bool).to("cuda")
 
-            lambda_depth_normal = opt.lambda_depth_normal
+            # lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
                 rendered_expected_depth: torch.Tensor = render_pkg["expected_depth"].squeeze(0)
                 rendered_median_depth: torch.Tensor = render_pkg["median_depth"]
@@ -301,7 +301,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                     return_aligned_prior=False,
                 )
                 # pcc_depth_loss = pcc_loss2(rendered_expected_depth, gt_depth_tensor, valid_mask&depth_mask)
-                pcc_depth_loss = torch.tensor(0.0, device="cuda")
+                # pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
             else:
                 rendered_expected_coord: torch.Tensor = render_pkg["expected_coord"]
@@ -309,15 +309,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = point_double_to_normal(viewpoint_cam, rendered_expected_coord, rendered_median_coord)
                 depth_order_loss = torch.tensor(0.0, device="cuda")
-                pcc_depth_loss = torch.tensor(0.0, device="cuda")
+                # pcc_depth_loss = torch.tensor(0.0, device="cuda")
             depth_ratio = 0.6
             normal_error_map = (1 - (rendered_normal.unsqueeze(0) * depth_middepth_normal).sum(dim=1))
             depth_normal_loss = (1-depth_ratio) * normal_error_map[0].mean() + depth_ratio * normal_error_map[1].mean()
         else:
-            lambda_depth_normal = 0
+            # lambda_depth_normal = 0
             depth_normal_loss = torch.tensor([0],dtype=torch.float32,device="cuda")
             depth_order_loss = torch.tensor(0.0, device="cuda")
-            pcc_depth_loss = torch.tensor(0.0, device="cuda")
+            # pcc_depth_loss = torch.tensor(0.0, device="cuda")
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
