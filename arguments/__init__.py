@@ -92,8 +92,8 @@ class OptimizationParams(ParamGroup):
         self.densification_interval = 100
         self.opacity_reset_interval = 1000
         self.densify_from_iter = 300
-        self.densify_until_iter = 4000
-        self.regularization_from_iter = 4000
+        self.densify_until_iter = 2000
+        self.regularization_from_iter = 2000
         self.densify_grad_threshold = 0.0002
         self.erank_lambda = 1.0
 
