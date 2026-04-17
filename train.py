@@ -321,7 +321,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         rgb_loss = (1.0 - opt.lambda_dssim) * Ll1_render + opt.lambda_dssim * (1.0 - ssim(rendered_image, gt_image.unsqueeze(0)))
 
-        if iteration > opt.iterations * 0.5:
+        if iteration > 2000:
             scale = gaussians.get_scaling
             erank = get_effective_rank(scale)
             erank_loss = opt.erank_lambda * torch.clamp(-torch.log(erank - 1 + 1e-7), 0).mean()
