@@ -161,10 +161,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             Ll1_render = l1_loss(rendered_image, gt_image)
 
-        reg_kick_on = False
-        if reg_kick_on:
+        # reg_kick_on = False
+        if iteration == 3900:
             lambda_depth_normal = opt.lambda_depth_normal
-            if require_depth:
+            if iteration == 3900:
                 rendered_expected_depth: torch.Tensor = render_pkg["expected_depth"]
                 rendered_median_depth: torch.Tensor = render_pkg["median_depth"]
                 rendered_normal: torch.Tensor = render_pkg["normal"]
