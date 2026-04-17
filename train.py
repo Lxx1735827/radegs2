@@ -271,7 +271,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 rendered_normal: torch.Tensor = render_pkg["normal"]
                 depth_middepth_normal = depth_double_to_normal(viewpoint_cam, rendered_expected_depth, rendered_median_depth)
                 depth_mask = render_pkg["mask"].squeeze() > 0
-                if iteration == 2900:
+                if iteration == 3900:
                     save_dir = os.path.join(dataset.model_path, "debug_expected_depth")
                     os.makedirs(save_dir, exist_ok=True)
 
