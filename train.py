@@ -161,7 +161,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         else:
             Ll1_render = l1_loss(rendered_image, gt_image)
 
-        
+        reg_kick_on = False
         if reg_kick_on:
             lambda_depth_normal = opt.lambda_depth_normal
             if require_depth:
