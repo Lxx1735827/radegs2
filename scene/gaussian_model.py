@@ -672,11 +672,11 @@ class GaussianModel:
 
         xyz = self.get_xyz
         device = xyz.device
-        camera_center = camera_center.to(device)
-        dist = torch.norm(xyz.detach() - camera_center[None, :], dim=1)
-        depth_threshold = torch.quantile(dist, depth_percentile)
-        select_depth_mask = dist >= depth_threshold
-        selected_pts_mask = torch.logical_or(select_depth_mask, selected_pts_mask)
+
+        random_ratio = 0.10
+        random_mask = torch.rand(xyz.shape[0], device=device) < random_ratio
+
+        selected_pts_mask = torch.logical_or(random_mask, selected_pts_mask)
 
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling, dim=1).values > self.percent_dense*scene_extent)
@@ -704,11 +704,11 @@ class GaussianModel:
 
         xyz = self.get_xyz
         device = xyz.device
-        camera_center = camera_center.to(device)
-        dist = torch.norm(xyz.detach() - camera_center[None, :], dim=1)
-        depth_threshold = torch.quantile(dist, depth_percentile)
-        select_depth_mask = dist >= depth_threshold
-        selected_pts_mask = torch.logical_or(select_depth_mask, selected_pts_mask)
+
+        random_ratio = 0.10
+        random_mask = torch.rand(xyz.shape[0], device=device) < random_ratio
+
+        selected_pts_mask = torch.logical_or(random_mask, selected_pts_mask)
 
         selected_pts_mask = torch.logical_and(selected_pts_mask,
                                               torch.max(self.get_scaling, dim=1).values <= self.percent_dense*scene_extent)
