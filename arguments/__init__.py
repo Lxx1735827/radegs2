@@ -95,6 +95,7 @@ class OptimizationParams(ParamGroup):
         self.densify_until_iter = 2000
         self.regularization_from_iter = 2000
         self.densify_grad_threshold = 0.0002
+        self.depth_percentile = 0.90
         self.erank_lambda = 1.0
 
         super().__init__(parser, "Optimization Parameters")
