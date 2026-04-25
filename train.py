@@ -360,7 +360,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
                 if iteration > opt.densify_from_iter and iteration % opt.densification_interval == 0:
                     size_threshold = 20 if iteration > opt.opacity_reset_interval else None
-                    gaussians.densify_and_prune(opt.densify_grad_threshold, 0.05, scene.cameras_extent, size_threshold, scene.camera_center, opt.depth_percentile)
+                    gaussians.densify_and_prune(opt.densify_grad_threshold, 0.05, scene.cameras_extent, size_threshold, viewpoint_cam.camera_center, opt.depth_percentile)
                     if dataset.disable_filter3D:
                         gaussians.reset_3D_filter()
                     else:
