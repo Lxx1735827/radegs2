@@ -673,7 +673,7 @@ class GaussianModel:
         xyz = self.get_xyz
         device = xyz.device
 
-        random_ratio = 0.30
+        random_ratio = 1 - depth_percentile
         random_mask = torch.rand(xyz.shape[0], device=device) < random_ratio
 
         selected_pts_mask = torch.logical_or(random_mask, selected_pts_mask)
@@ -705,7 +705,7 @@ class GaussianModel:
         xyz = self.get_xyz
         device = xyz.device
 
-        random_ratio = 0.30
+        random_ratio = 1 - depth_percentile
         random_mask = torch.rand(xyz.shape[0], device=device) < random_ratio
 
         selected_pts_mask = torch.logical_or(random_mask, selected_pts_mask)
