@@ -416,7 +416,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
             # 构造观察方向 v(x, y)
             view_dirs = build_view_dirs_camera(H, W, fx, fy, cx, cy, device="cuda")
-            rgb_weight = compute_surface_area_weight(gt_depth_tensor, gt_normal_tensor, valid_mask, valid_mask_normal,
+            rgb_weight, _, _ = compute_surface_area_weight(gt_depth_tensor, gt_normal_tensor, valid_mask, valid_mask_normal,
                                                      view_dirs)
             Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, rgb_weight)
 
