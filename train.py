@@ -25,7 +25,7 @@ from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
 from utils.erank import get_effective_rank
-from utils.weight import compute_surface_area_weight, get_intrinsics_from_viewpoint, build_view_dirs_camera
+from utils.weight import compute_surface_area_weight, get_intrinsics_from_viewpoint, build_view_dirs_camera, compute_depth_weight
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from utils.global_align import weighted_global_aligned_pcc_loss
@@ -417,8 +417,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
             # 构造观察方向 v(x, y)
             view_dirs = build_view_dirs_camera(H, W, fx, fy, cx, cy, device="cuda")
-            rgb_weight, _, _ = compute_surface_area_weight(gt_depth_tensor, gt_normal_tensor, valid_mask, valid_mask_normal,
-                                                     view_dirs)
+            rgb_weight, _, _ = compute_depth_weight(gt_depth_tensor, valid_mask)
             Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, rgb_weight)
 
 

@@ -153,3 +153,50 @@ def compute_surface_area_weight(
         area_prob = torch.zeros_like(area_weight)
 
     return area_weight, area_prob, valid_mask
+
+def compute_depth_weight(
+    depth_tensor,
+    valid_depth_mask,
+    clamp_quantile=0.99
+):
+    """
+    只根据深度计算像素权重。
+
+    depth_tensor: H x W
+    valid_depth_mask: H x W
+
+    返回:
+        depth_weight: H x W，未归一化深度权重
+        depth_prob: H x W，归一化后的采样概率
+        valid_mask: H x W，有效像素 mask
+    """
+
+    valid_mask = valid_depth_mask
+
+    # w(x, y) = d(x, y)^2
+    depth_weight = depth_tensor ** 2
+
+    # 无效像素权重置 0
+    depth_weight = torch.where(
+        valid_mask,
+        depth_weight,
+        torch.zeros_like(depth_weight)
+    )
+
+    # 防止极大深度导致权重过大
+    if clamp_quantile is not None:
+        valid_weight = depth_weight[depth_weight > 0]
+
+        if valid_weight.numel() > 0:
+            max_weight = torch.quantile(valid_weight, clamp_quantile)
+            depth_weight = torch.clamp(depth_weight, max=max_weight)
+
+    # 归一化成采样概率
+    weight_sum = depth_weight.sum()
+
+    if weight_sum > 0:
+        depth_prob = depth_weight / weight_sum
+    else:
+        depth_prob = torch.zeros_like(depth_weight)
+
+    return depth_weight, depth_prob, valid_mask
