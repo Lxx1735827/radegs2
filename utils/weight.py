@@ -51,22 +51,22 @@ def prepare_normal_tensor(normal_np, device="cuda", normal_encoded_01=False):
 # =========================================================
 def get_intrinsics_from_viewpoint(viewpoint_cam, H, W, device="cuda"):
     if hasattr(viewpoint_cam, "Fx"):
-        fx = float(viewpoint_cam.fx)
+        fx = float(viewpoint_cam.Fx)
     else:
         fx = fov2focal(float(viewpoint_cam.FoVx), W)
 
     if hasattr(viewpoint_cam, "Fy"):
-        fy = float(viewpoint_cam.fy)
+        fy = float(viewpoint_cam.Fy)
     else:
         fy = fov2focal(float(viewpoint_cam.FoVy), H)
 
     if hasattr(viewpoint_cam, "Cx"):
-        cx = float(viewpoint_cam.cx)
+        cx = float(viewpoint_cam.Cx)
     else:
         cx = W / 2.0
 
     if hasattr(viewpoint_cam, "Cy"):
-        cy = float(viewpoint_cam.cy)
+        cy = float(viewpoint_cam.Cy)
     else:
         cy = H / 2.0
 
