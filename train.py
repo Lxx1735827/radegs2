@@ -24,6 +24,7 @@ from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
 from utils.erank import get_effective_rank
+from utils.weight import compute_surface_area_weight, get_intrinsics_from_viewpoint, build_view_dirs_camera
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from utils.global_align import weighted_global_aligned_pcc_loss
@@ -42,27 +43,170 @@ import matplotlib.pyplot as plt
 from utils.vis_utils import apply_depth_colormap
 
 # function L1_loss_appearance is fork from GOF https://github.com/autonomousvision/gaussian-opacity-fields/blob/main/train.py
+def weighted_l1_loss(pred, target, weight, eps=1e-8):
+    """
+    pred:   C x H x W
+    target: C x H x W
+    weight: H x W 或 1 x H x W 或 C x H x W
+
+    返回加权 L1 loss
+    """
+
+    diff = torch.abs(pred - target)
+
+    # weight: H x W -> 1 x H x W
+    if weight.ndim == 2:
+        weight = weight.unsqueeze(0)
+
+    # weight: 1 x H x W -> C x H x W
+    if weight.shape[0] == 1:
+        weight = weight.expand_as(diff)
+
+    # 防止 NaN / Inf
+    valid_mask = torch.isfinite(weight) & (weight > 0)
+    weight = torch.where(valid_mask, weight, torch.zeros_like(weight))
+
+    loss = (diff * weight).sum() / (weight.sum() + eps)
+
+    return loss
+
+
+def L1_loss_appearance2(
+    image,
+    gt_image,
+    gaussians,
+    view_idx,
+    pixel_weight=None,
+    return_transformed_image=False
+):
+    """
+    image: C x H x W
+    gt_image: C x H x W
+    pixel_weight: 每个像素的权重，可以是：
+        H x W
+        1 x H x W
+        C x H x W
+
+    如果 pixel_weight=None，则退化为普通 L1 loss
+    """
+
+    appearance_embedding = gaussians.get_apperance_embedding(view_idx)
+
+    # 原始图像尺寸
+    origH, origW = image.shape[1:]
+
+    # center crop，使 H 和 W 能被 32 整除
+    H = origH // 32 * 32
+    W = origW // 32 * 32
+
+    left = origW // 2 - W // 2
+    top = origH // 2 - H // 2
+
+    crop_image = image[:, top:top + H, left:left + W]
+    crop_gt_image = gt_image[:, top:top + H, left:left + W]
+
+    # 同样裁剪 pixel_weight
+    if pixel_weight is not None:
+        pixel_weight = pixel_weight.to(device=image.device, dtype=image.dtype)
+
+        if pixel_weight.ndim == 2:
+            crop_weight = pixel_weight[top:top + H, left:left + W]
+
+        elif pixel_weight.ndim == 3:
+            crop_weight = pixel_weight[:, top:top + H, left:left + W]
+
+        else:
+            raise ValueError(f"pixel_weight 维度错误，当前 shape = {pixel_weight.shape}")
+
+    # downsample image
+    crop_image_down = F.interpolate(
+        crop_image[None],
+        size=(H // 32, W // 32),
+        mode="bilinear",
+        align_corners=True
+    )[0]
+
+    # 拼接 appearance embedding
+    appearance_map = appearance_embedding[None].repeat(
+        H // 32,
+        W // 32,
+        1
+    ).permute(2, 0, 1)
+
+    crop_image_down = torch.cat(
+        [crop_image_down, appearance_map],
+        dim=0
+    )[None]
+
+    # appearance 网络预测颜色映射
+    mapping_image = gaussians.appearance_network(crop_image_down)
+
+    # 应用 appearance correction
+    transformed_image = mapping_image * crop_image
+
+    if return_transformed_image:
+        transformed_image = F.interpolate(
+            transformed_image[None],
+            size=(origH, origW),
+            mode="bilinear",
+            align_corners=True
+        )[0]
+
+        return transformed_image
+
+    # 如果没有传入权重，就用普通 L1
+    if pixel_weight is None:
+        return l1_loss(transformed_image, crop_gt_image)
+
+    # 如果传入权重，就用加权 L1
+    return weighted_l1_loss(
+        transformed_image,
+        crop_gt_image,
+        crop_weight
+    )
+
 def L1_loss_appearance(image, gt_image, gaussians, view_idx, return_transformed_image=False):
     appearance_embedding = gaussians.get_apperance_embedding(view_idx)
+
     # center crop the image
     origH, origW = image.shape[1:]
     H = origH // 32 * 32
     W = origW // 32 * 32
     left = origW // 2 - W // 2
     top = origH // 2 - H // 2
-    crop_image = image[:, top:top+H, left:left+W]
-    crop_gt_image = gt_image[:, top:top+H, left:left+W]
-    
+
+    crop_image = image[:, top:top + H, left:left + W]
+    crop_gt_image = gt_image[:, top:top + H, left:left + W]
+
     # down sample the image
-    crop_image_down = torch.nn.functional.interpolate(crop_image[None], size=(H//32, W//32), mode="bilinear", align_corners=True)[0]
-    
-    crop_image_down = torch.cat([crop_image_down, appearance_embedding[None].repeat(H//32, W//32, 1).permute(2, 0, 1)], dim=0)[None]
+    crop_image_down = torch.nn.functional.interpolate(
+        crop_image[None],
+        size=(H // 32, W // 32),
+        mode="bilinear",
+        align_corners=True
+    )[0]
+
+    crop_image_down = torch.cat(
+        [
+            crop_image_down,
+            appearance_embedding[None].repeat(H // 32, W // 32, 1).permute(2, 0, 1)
+        ],
+        dim=0
+    )[None]
+
     mapping_image = gaussians.appearance_network(crop_image_down)
     transformed_image = mapping_image * crop_image
+
     if not return_transformed_image:
         return l1_loss(transformed_image, crop_gt_image)
     else:
-        transformed_image = torch.nn.functional.interpolate(transformed_image, size=(origH, origW), mode="bilinear", align_corners=True)[0]
+        transformed_image = torch.nn.functional.interpolate(
+            transformed_image,
+            size=(origH, origW),
+            mode="bilinear",
+            align_corners=True
+        )[0]
+
         return transformed_image
 
 def fit_scale_shift_torch(source, target):
@@ -123,7 +267,7 @@ def pcc_loss2(
     mask,
     eps=1e-6,
     min_valid=50,
-    apply_alignment=True  # ✅ 是否拟合对齐，默认开启
+    apply_alignment=True
 ):
     # 维度处理
     if pred_depth.dim() == 3:
@@ -259,6 +403,24 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             gt_depth = np.load(original_depth_dir + original_depth_file)
             gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
             valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
+            original_normal_file = viewpoint_cam.image_name + ".npy"
+            original_normal_dir = os.path.join(dataset.source_path, "normal/")
+            gt_normal = np.load(original_normal_dir + original_normal_file)
+            gt_normal_tensor = torch.tensor(gt_normal, dtype=torch.float32, device="cuda")
+            valid_mask_normal = torch.isfinite(gt_normal_tensor).all(dim=-1) & (
+                    torch.norm(gt_normal_tensor, dim=-1) > 1e-8
+            )
+            H, W = gt_depth_tensor.shape
+
+            fx, fy, cx, cy = get_intrinsics_from_viewpoint(viewpoint_cam, H, W, device="cuda")
+
+            # 构造观察方向 v(x, y)
+            view_dirs = build_view_dirs_camera(H, W, fx, fy, cx, cy, device="cuda")
+            rgb_weight = compute_surface_area_weight(gt_depth_tensor, gt_normal_tensor, valid_mask, valid_mask_normal,
+                                                     view_dirs)
+            Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, rgb_weight)
+
+
             original_mask_dir = os.path.join(dataset.source_path, "mask/")
             original_mask_file = viewpoint_cam.image_name + ".npy"
             sam_masks = np.load(os.path.join(original_mask_dir, original_mask_file))
@@ -288,7 +450,6 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         os.path.join(save_dir, f"{viewpoint_cam.image_name}_iter2900.npy"),
                         expected_depth_np
                     )
-
 
                 min_area = 100
                 # depth_order_loss = torch.tensor(0.0, device="cuda")
