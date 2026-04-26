@@ -19,6 +19,7 @@ from scene import Scene, GaussianModel
 from utils.general_utils import safe_state
 import uuid
 from tqdm import tqdm
+import torch.nn.functional as F
 from utils.image_utils import psnr
 from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
