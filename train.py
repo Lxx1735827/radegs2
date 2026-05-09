@@ -407,7 +407,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         view_dirs = np.load(os.path.join(dataset.source_path, "view_dirs", viewpoint_cam.image_name + ".npy"))
         view_dirs_tensor = torch.tensor(view_dirs, dtype=torch.float32, device="cuda")
         moge_mask = np.load(os.path.join(dataset.source_path, "moge_mask", viewpoint_cam.image_name + ".npy"))
-        moge_mask_tensor = torch.tensor(moge_mask, dtype=torch.float32, device="cuda")
+        moge_mask_tensor = torch.tensor(moge_mask, dtype=torch.bool, device="cuda")
         area_weight, _, _ = compute_depth_normal_weight(
             depth_tensor=gt_depth_tensor,
             normal_tensor=gt_normal_tensor,
