@@ -392,40 +392,40 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                                                                     render_pkg["radii"])
         gt_image = viewpoint_cam.original_image.cuda()
 
-        if dataset.use_decoupled_appearance:
-            Ll1_render = L1_loss_appearance(rendered_image, gt_image, gaussians, viewpoint_cam.uid)
-        else:
-            Ll1_render = l1_loss(rendered_image, gt_image)
+        original_depth_file = viewpoint_cam.image_name + ".npy"
+        original_depth_dir = os.path.join(dataset.source_path, "depth/")
+        gt_depth = np.load(original_depth_dir + original_depth_file)
+        gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
+        valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
+        original_normal_file = viewpoint_cam.image_name + ".npy"
+        original_normal_dir = os.path.join(dataset.source_path, "normal/")
+        gt_normal = np.load(original_normal_dir + original_normal_file)
+        gt_normal_tensor = torch.tensor(gt_normal, dtype=torch.float32, device="cuda")
+        valid_mask_normal = torch.isfinite(gt_normal_tensor).all(dim=-1) & (
+                torch.norm(gt_normal_tensor, dim=-1) > 1e-8
+        )
+        view_dirs = np.load(os.path.join(dataset.source_path, "view_dirs", viewpoint_cam.image_name + ".npy"))
+        view_dirs_tensor = torch.tensor(view_dirs, dtype=torch.float32, device="cuda")
+        moge_mask = np.load(os.path.join(dataset.source_path, "moge_mask", viewpoint_cam.image_name + ".npy"))
+        moge_mask_tensor = torch.tensor(moge_mask, dtype=torch.float32, device="cuda")
+        area_weight, _, _ = compute_depth_normal_weight(
+            depth_tensor=gt_depth_tensor,
+            normal_tensor=gt_normal_tensor,
+            view_dirs=view_dirs_tensor,
+            valid_depth_mask=moge_mask_tensor,
+            valid_normal_mask=moge_mask_tensor,
+            eps=1e-6,
+            clamp_quantile=0.99
+        )
+        Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, area_weight)
+
+        # if dataset.use_decoupled_appearance:
+        #     Ll1_render = L1_loss_appearance(rendered_image, gt_image, gaussians, viewpoint_cam.uid)
+        # else:
+        #     Ll1_render = l1_loss(rendered_image, gt_image)
 
         # reg_kick_on = False
         if reg_kick_on:
-            original_depth_file = viewpoint_cam.image_name + ".npy"
-            original_depth_dir = os.path.join(dataset.source_path, "depth/")
-            gt_depth = np.load(original_depth_dir + original_depth_file)
-            gt_depth_tensor = torch.tensor(gt_depth, dtype=torch.float32, device="cuda")
-            valid_mask = torch.isfinite(gt_depth_tensor) & (gt_depth_tensor > 0)
-            original_normal_file = viewpoint_cam.image_name + ".npy"
-            original_normal_dir = os.path.join(dataset.source_path, "normal/")
-            gt_normal = np.load(original_normal_dir + original_normal_file)
-            gt_normal_tensor = torch.tensor(gt_normal, dtype=torch.float32, device="cuda")
-            valid_mask_normal = torch.isfinite(gt_normal_tensor).all(dim=-1) & (
-                    torch.norm(gt_normal_tensor, dim=-1) > 1e-8
-            )
-            view_dirs = np.load(os.path.join(dataset.source_path, "view_dirs", viewpoint_cam.image_name + ".npy"))
-            view_dirs_tensor = torch.tensor(view_dirs, dtype=torch.float32, device="cuda")
-            moge_mask = np.load(os.path.join(dataset.source_path, "moge_mask", viewpoint_cam.image_name + ".npy"))
-            moge_mask_tensor = torch.tensor(moge_mask, dtype=torch.float32, device="cuda")
-            area_weight, _, _ = compute_depth_normal_weight(
-                depth_tensor=gt_depth_tensor,
-                normal_tensor=gt_normal_tensor,
-                view_dirs=view_dirs_tensor,
-                valid_depth_mask=moge_mask_tensor,
-                valid_normal_mask=moge_mask_tensor,
-                eps=1e-6,
-                clamp_quantile=0.99
-            )
-            Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, area_weight)
-
             original_mask_dir = os.path.join(dataset.source_path, "mask/")
             original_mask_file = viewpoint_cam.image_name + ".npy"
             sam_masks = np.load(os.path.join(original_mask_dir, original_mask_file))
