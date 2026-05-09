@@ -154,6 +154,78 @@ def compute_surface_area_weight(
 
     return area_weight, area_prob, valid_mask
 
+import torch
+import torch.nn.functional as F
+
+
+def compute_depth_normal_weight(
+    depth_tensor,
+    normal_tensor,
+    view_dirs,
+    valid_depth_mask,
+    valid_normal_mask=None,
+    eps=1e-6,
+    clamp_quantile=0.99,
+    normalize_vectors=True
+):
+
+    assert depth_tensor.ndim == 2, "depth_tensor 应该是 H x W"
+    assert normal_tensor.ndim == 3 and normal_tensor.shape[-1] == 3, "normal_tensor 应该是 H x W x 3"
+    assert view_dirs.ndim == 3 and view_dirs.shape[-1] == 3, "view_dirs 应该是 H x W x 3"
+
+    H, W = depth_tensor.shape
+    assert normal_tensor.shape[:2] == (H, W), "normal_tensor 分辨率必须和 depth_tensor 一致"
+    assert view_dirs.shape[:2] == (H, W), "view_dirs 分辨率必须和 depth_tensor 一致"
+
+    if valid_normal_mask is None:
+        valid_normal_mask = torch.ones_like(valid_depth_mask, dtype=torch.bool)
+
+    valid_mask = valid_depth_mask & valid_normal_mask
+
+    # 去掉 NaN / Inf
+    valid_mask = valid_mask & torch.isfinite(depth_tensor)
+
+    valid_mask = valid_mask & torch.isfinite(normal_tensor).all(dim=-1)
+    valid_mask = valid_mask & torch.isfinite(view_dirs).all(dim=-1)
+
+    valid_mask = valid_mask & (depth_tensor > 0)
+
+    # 保险起见，重新归一化 normal 和 view direction
+    if normalize_vectors:
+        normal_tensor = F.normalize(normal_tensor, dim=-1, eps=eps)
+        view_dirs = F.normalize(view_dirs, dim=-1, eps=eps)
+
+    # n · v
+    cos_term = torch.sum(normal_tensor * view_dirs, dim=-1).abs()
+
+    # w = d^2 / (|n · v| + eps)
+    area_weight = depth_tensor ** 2 / (cos_term + eps)
+
+    # 无效区域权重置 0
+    area_weight = torch.where(
+        valid_mask,
+        area_weight,
+        torch.zeros_like(area_weight)
+    )
+
+    # 防止 grazing angle 位置权重爆炸
+    if clamp_quantile is not None:
+        valid_weight = area_weight[area_weight > 0]
+
+        if valid_weight.numel() > 0:
+            max_weight = torch.quantile(valid_weight, clamp_quantile)
+            area_weight = torch.clamp(area_weight, max=max_weight)
+
+    # 归一化成采样概率
+    weight_sum = area_weight.sum()
+
+    if weight_sum.item() > 0:
+        area_prob = area_weight / weight_sum
+    else:
+        area_prob = torch.zeros_like(area_weight)
+
+    return area_weight, area_prob, valid_mask
+
 def compute_depth_weight(
     depth_tensor,
     valid_depth_mask,

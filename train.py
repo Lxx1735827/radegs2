@@ -25,7 +25,7 @@ from utils.graphics_utils import point_double_to_normal, depth_double_to_normal
 from utils.sam2_utils import save_dir_segmentations
 from utils.align import weighted_masked_pcc_loss
 from utils.erank import get_effective_rank
-from utils.weight import compute_surface_area_weight, get_intrinsics_from_viewpoint, build_view_dirs_camera, compute_depth_weight
+from utils.weight import compute_surface_area_weight, get_intrinsics_from_viewpoint, build_view_dirs_camera, compute_depth_weight, compute_depth_normal_weight
 from utils.abs_depth import weighted_masked_l1_loss
 from utils.depth_order import compute_depth_order_loss
 from utils.global_align import weighted_global_aligned_pcc_loss
@@ -411,15 +411,20 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             valid_mask_normal = torch.isfinite(gt_normal_tensor).all(dim=-1) & (
                     torch.norm(gt_normal_tensor, dim=-1) > 1e-8
             )
-            H, W = gt_depth_tensor.shape
-
-            fx, fy, cx, cy = get_intrinsics_from_viewpoint(viewpoint_cam, H, W, device="cuda")
-
-            # 构造观察方向 v(x, y)
-            view_dirs = build_view_dirs_camera(H, W, fx, fy, cx, cy, device="cuda")
-            rgb_weight, _, _ = compute_depth_weight(gt_depth_tensor, valid_mask)
-            Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, rgb_weight)
-
+            view_dirs = np.load(os.path.join(dataset.source_path, "view_dirs", viewpoint_cam.image_name + ".npy"))
+            view_dirs_tensor = torch.tensor(view_dirs, dtype=torch.float32, device="cuda")
+            moge_mask = np.load(os.path.join(dataset.source_path, "moge_mask", viewpoint_cam.image_name + ".npy"))
+            moge_mask_tensor = torch.tensor(moge_mask, dtype=torch.float32, device="cuda")
+            area_weight, _, _ = compute_depth_normal_weight(
+                depth_tensor=gt_depth_tensor,
+                normal_tensor=gt_normal_tensor,
+                view_dirs=view_dirs_tensor,
+                valid_depth_mask=moge_mask_tensor,
+                valid_normal_mask=moge_mask_tensor,
+                eps=1e-6,
+                clamp_quantile=0.99
+            )
+            Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, area_weight)
 
             original_mask_dir = os.path.join(dataset.source_path, "mask/")
             original_mask_file = viewpoint_cam.image_name + ".npy"
