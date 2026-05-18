@@ -14,8 +14,39 @@ import torch.nn.functional as F
 from torch.autograd import Variable
 from math import exp
 
-def l1_loss(network_output, gt):
-    return torch.abs((network_output - gt)).mean()
+# def l1_loss(network_output, gt):
+#     return torch.abs((network_output - gt)).mean()
+def l1_loss(network_output, gt, pixel_weight=None, eps=1e-8):
+    """
+    network_output: C x H x W
+    gt: C x H x W
+    pixel_weight:
+        None        -> 普通 L1
+        H x W       -> 每个像素一个权重
+        1 x H x W   -> 每个像素一个权重，自动广播到 C 通道
+        C x H x W   -> 每个通道、每个像素一个权重
+    """
+
+    loss = torch.abs(network_output - gt)
+
+    if pixel_weight is None:
+        return loss.mean()
+
+    pixel_weight = pixel_weight.to(device=loss.device, dtype=loss.dtype)
+
+    if pixel_weight.ndim == 2:
+        pixel_weight = pixel_weight.unsqueeze(0)
+
+    if pixel_weight.ndim != 3:
+        raise ValueError(f"pixel_weight 维度错误，当前 shape = {pixel_weight.shape}")
+
+    # 如果是 1 x H x W，会自动广播到 C x H x W
+    weighted_loss = loss * pixel_weight
+
+    # 分母也要按广播后的权重算，避免权重整体变大导致 loss 尺度变化
+    weight_sum = pixel_weight.expand_as(loss).sum()
+
+    return weighted_loss.sum() / (weight_sum + eps)
 
 def l2_loss(network_output, gt):
     return ((network_output - gt) ** 2).mean()

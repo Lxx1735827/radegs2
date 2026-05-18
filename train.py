@@ -417,12 +417,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             eps=1e-6,
             clamp_quantile=0.99
         )
-        Ll1_render = L1_loss_appearance2(rendered_image, gt_image, gaussians, viewpoint_cam.uid, area_weight)
-
-        # if dataset.use_decoupled_appearance:
-        #     Ll1_render = L1_loss_appearance(rendered_image, gt_image, gaussians, viewpoint_cam.uid)
-        # else:
-        #     Ll1_render = l1_loss(rendered_image, gt_image)
+        if reg_kick_on:
+            Ll1_render = l1_loss(rendered_image, gt_image,area_weight)
+        else:
+            Ll1_render = l1_loss(rendered_image, gt_image)
 
         # reg_kick_on = False
         if reg_kick_on:
