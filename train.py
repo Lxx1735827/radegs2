@@ -417,13 +417,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             eps=1e-6,
             clamp_quantile=0.99
         )
-        # if reg_kick_on:
-        #     Ll1_render = l1_loss(rendered_image, gt_image, area_weight)
-        # else:
-        #     Ll1_render = l1_loss(rendered_image, gt_image)
-        if iteration%100==0:
-            print(area_weight)
-        Ll1_render = l1_loss(rendered_image, gt_image, area_weight)
+        if reg_kick_on:
+            Ll1_render = l1_loss(rendered_image, gt_image, area_weight)
+        else:
+            Ll1_render = l1_loss(rendered_image, gt_image)
+        # if iteration%100==0:
+        #     print(area_weight)
+        # Ll1_render = l1_loss(rendered_image, gt_image, area_weight)
         # reg_kick_on = False
         if reg_kick_on:
             original_mask_dir = os.path.join(dataset.source_path, "mask/")
